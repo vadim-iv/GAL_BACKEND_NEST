@@ -76,7 +76,7 @@ export class DecisionService {
 		const { decisionId, answers } = dto
 
 		const decision = await this.decisionModel.findById(decisionId)
-		if (!decision) throw new NotFoundException('Decision not found')
+		if (!decision) throw new NotFoundException('Decision not found') 
 
 		const now = new Date()
 		if (now < decision.voteStart || now > decision.voteEnd) {
