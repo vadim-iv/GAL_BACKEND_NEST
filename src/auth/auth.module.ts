@@ -6,10 +6,15 @@ import { JwtStrategy } from './jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { getJwtConfig } from 'src/config/jwt.config';
+import { MembersAuthService } from './members-auth/members-auth.service';
+import { MembersAuthController } from './members-auth/members-auth.controller';
+import { MembersModule } from 'src/members/members.module';
+import { MembersJwtStrategy } from './members-jwt.strategy';
 
 @Module({
   imports: [
     AdminModule, 
+    MembersModule,
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -17,7 +22,7 @@ import { getJwtConfig } from 'src/config/jwt.config';
       useFactory: getJwtConfig
     })
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  controllers: [AuthController, MembersAuthController],
+  providers: [AuthService, JwtStrategy, MembersAuthService, MembersJwtStrategy],
 })
 export class AuthModule {}

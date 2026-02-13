@@ -44,7 +44,7 @@ let ContactService = class ContactService {
     async sendToGal(dto) {
         const response = await this.transporter.sendMail({
             from: `"GAL Contact Form" <${dto.email}>`,
-            to: process.env.SMTP_USERNAME,
+            to: process.env.SMTP_DEST,
             subject: dto.subject,
             text: dto.message,
             html: this.createHtmlMessage(dto),

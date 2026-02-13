@@ -19,6 +19,9 @@ const management_module_1 = require("./management/management.module");
 const documents_module_1 = require("./documents/documents.module");
 const search_module_1 = require("./search/search.module");
 const contact_module_1 = require("./contact/contact.module");
+const members_module_1 = require("./members/members.module");
+const project_module_1 = require("./project/project.module");
+const decision_module_1 = require("./decision/decision.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -38,6 +41,9 @@ exports.AppModule = AppModule = __decorate([
             documents_module_1.DocumentsModule,
             search_module_1.SearchModule,
             contact_module_1.ContactModule,
+            members_module_1.MembersModule,
+            project_module_1.ProjectModule,
+            decision_module_1.DecisionModule,
         ]
     })
 ], AppModule);

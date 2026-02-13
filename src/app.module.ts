@@ -10,6 +10,9 @@ import { ManagementModule } from './management/management.module';
 import { DocumentsModule } from './documents/documents.module';
 import { SearchModule } from './search/search.module';
 import { ContactModule } from './contact/contact.module';
+import { MembersModule } from './members/members.module';
+import { ProjectModule } from './project/project.module';
+import { DecisionModule } from './decision/decision.module';
 
 @Module({
 	imports: [
@@ -26,6 +29,9 @@ import { ContactModule } from './contact/contact.module';
 		DocumentsModule,
 		SearchModule,
 		ContactModule,
+		MembersModule,
+		ProjectModule,
+		DecisionModule,
 	]
 })
 export class AppModule {}

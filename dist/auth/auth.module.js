@@ -15,6 +15,10 @@ const jwt_strategy_1 = require("./jwt.strategy");
 const config_1 = require("@nestjs/config");
 const jwt_1 = require("@nestjs/jwt");
 const jwt_config_1 = require("../config/jwt.config");
+const members_auth_service_1 = require("./members-auth/members-auth.service");
+const members_auth_controller_1 = require("./members-auth/members-auth.controller");
+const members_module_1 = require("../members/members.module");
+const members_jwt_strategy_1 = require("./members-jwt.strategy");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -22,6 +26,7 @@ exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
         imports: [
             admin_module_1.AdminModule,
+            members_module_1.MembersModule,
             config_1.ConfigModule,
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],
@@ -29,8 +34,8 @@ exports.AuthModule = AuthModule = __decorate([
                 useFactory: jwt_config_1.getJwtConfig
             })
         ],
-        controllers: [auth_controller_1.AuthController],
-        providers: [auth_service_1.AuthService, jwt_strategy_1.JwtStrategy],
+        controllers: [auth_controller_1.AuthController, members_auth_controller_1.MembersAuthController],
+        providers: [auth_service_1.AuthService, jwt_strategy_1.JwtStrategy, members_auth_service_1.MembersAuthService, members_jwt_strategy_1.MembersJwtStrategy],
     })
 ], AuthModule);
 //# sourceMappingURL=auth.module.js.map
