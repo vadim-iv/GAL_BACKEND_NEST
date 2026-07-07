@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import { Member } from 'src/schemas/member.schema'
@@ -6,10 +6,24 @@ import { MemberDto } from './dto/member.dto'
 import { hash } from 'argon2'
 import * as nodemailer from 'nodemailer'
 import { UpdateMemberDto } from './dto/update-member.dto'
+import { ManagementService } from 'src/management/management.service'
 
 @Injectable()
 export class MembersService {
-	constructor(@InjectModel(Member.name) private memberModel: Model<Member>) {}
+	private readonly logger = new Logger(MembersService.name)
+
+	constructor(
+		@InjectModel(Member.name) private memberModel: Model<Member>,
+		private readonly managementService: ManagementService
+	) {}
+
+	private async syncManagement() {
+		try {
+			await this.managementService.syncFromMembers()
+		} catch (err) {
+			this.logger.error('Failed to sync management from members', err)
+		}
+	}
 
 	private transporter = nodemailer.createTransport({
 		service: 'gmail',
@@ -94,6 +108,8 @@ export class MembersService {
 			replyTo: process.env.SMTP_USERNAME
 		})
 
+		await this.syncManagement()
+
 		return member.toObject()
 	}
 
@@ -101,12 +117,19 @@ export class MembersService {
 		if (!dto || Object.keys(dto).length === 0) throw new BadRequestException('No data provided')
 		let data = dto
 
-		return this.memberModel.findByIdAndUpdate(id, data, { new: true })
+		const member = await this.memberModel.findByIdAndUpdate(id, data, { new: true })
+
+		await this.syncManagement()
+
+		return member
 	}
 
 	async delete(id: string) {
 		const member = await this.memberModel.findByIdAndDelete(id).exec()
 		if (!member) throw new NotFoundException('Member not found')
+
+		await this.syncManagement()
+
 		return member
 	}
 

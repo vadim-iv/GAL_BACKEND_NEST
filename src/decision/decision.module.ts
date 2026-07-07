@@ -3,9 +3,10 @@ import { DecisionService } from './decision.service';
 import { DecisionController } from './decision.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Decision, DecisionSchema } from 'src/schemas/decision.schema';
+import { AwsModule } from 'src/aws/aws.module';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Decision.name, schema: DecisionSchema }])],
+  imports: [AwsModule, MongooseModule.forFeature([{ name: Decision.name, schema: DecisionSchema }])],
   controllers: [DecisionController],
   providers: [DecisionService],
 })

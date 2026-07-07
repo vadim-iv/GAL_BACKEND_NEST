@@ -12,12 +12,13 @@ const decision_service_1 = require("./decision.service");
 const decision_controller_1 = require("./decision.controller");
 const mongoose_1 = require("@nestjs/mongoose");
 const decision_schema_1 = require("../schemas/decision.schema");
+const aws_module_1 = require("../aws/aws.module");
 let DecisionModule = class DecisionModule {
 };
 exports.DecisionModule = DecisionModule;
 exports.DecisionModule = DecisionModule = __decorate([
     (0, common_1.Module)({
-        imports: [mongoose_1.MongooseModule.forFeature([{ name: decision_schema_1.Decision.name, schema: decision_schema_1.DecisionSchema }])],
+        imports: [aws_module_1.AwsModule, mongoose_1.MongooseModule.forFeature([{ name: decision_schema_1.Decision.name, schema: decision_schema_1.DecisionSchema }])],
         controllers: [decision_controller_1.DecisionController],
         providers: [decision_service_1.DecisionService],
     })

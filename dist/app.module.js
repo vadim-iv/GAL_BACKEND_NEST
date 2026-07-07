@@ -20,7 +20,7 @@ const documents_module_1 = require("./documents/documents.module");
 const search_module_1 = require("./search/search.module");
 const contact_module_1 = require("./contact/contact.module");
 const members_module_1 = require("./members/members.module");
-const project_module_1 = require("./project/project.module");
+const local_call_module_1 = require("./local-call/local-call.module");
 const decision_module_1 = require("./decision/decision.module");
 let AppModule = class AppModule {
 };
@@ -42,7 +42,7 @@ exports.AppModule = AppModule = __decorate([
             search_module_1.SearchModule,
             contact_module_1.ContactModule,
             members_module_1.MembersModule,
-            project_module_1.ProjectModule,
+            local_call_module_1.LocalCallModule,
             decision_module_1.DecisionModule,
         ]
     })

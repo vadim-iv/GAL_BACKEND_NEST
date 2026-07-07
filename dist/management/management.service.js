@@ -17,10 +17,15 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const management_schema_1 = require("../schemas/management.schema");
+const member_schema_1 = require("../schemas/member.schema");
+const member_enum_1 = require("../enums/member.enum");
+const LANGS = ['ro', 'ru', 'en'];
 let ManagementService = class ManagementService {
     managementModel;
-    constructor(managementModel) {
+    memberModel;
+    constructor(managementModel, memberModel) {
         this.managementModel = managementModel;
+        this.memberModel = memberModel;
     }
     async getManagement() {
         const management = await this.managementModel.findOne().exec();
@@ -29,25 +34,25 @@ let ManagementService = class ManagementService {
         }
         return management.toObject();
     }
-    async updateManagement(dto) {
-        if (!dto || Object.keys(dto).length === 0)
-            throw new common_1.BadRequestException('No data provided');
+    async updateMainImage(main_image) {
         const management = await this.managementModel
-            .findOneAndUpdate({}, dto, {
-            new: true,
-            upsert: true,
-            runValidators: true
-        })
+            .findOneAndUpdate({}, { $set: { main_image } }, { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true })
             .exec();
         return management.toObject();
     }
-    async initializeManagement(dto) {
-        const existingManagement = await this.managementModel.findOne().exec();
-        if (existingManagement) {
-            throw new common_1.BadRequestException('Management already exists. Use update instead.');
-        }
-        const management = await this.managementModel.create(dto);
-        return management.toObject();
+    async syncFromMembers() {
+        const members = await this.memberModel.find().exec();
+        const byRole = (role) => members.filter((m) => m.role === role).sort((a, b) => a.name.ro.localeCompare(b.name.ro));
+        const allMembersSorted = [...members].sort((a, b) => a.name.ro.localeCompare(b.name.ro));
+        const president = this.buildPresident(byRole(member_enum_1.MemberRolesEnum.PRESIDENT)[0]);
+        const executive = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.EXECUTIVE_BODY));
+        const administration = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.ADMINISTRATION));
+        const committee = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.SELECTION_COMMITTEE));
+        const censorship = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.CENSORSHIP_COMMITTEE));
+        const general_assembly = this.buildColumns(allMembersSorted);
+        await this.managementModel
+            .findOneAndUpdate({}, { $set: { president, executive, administration, committee, censorship, general_assembly } }, { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true })
+            .exec();
     }
     async search(query, limit = 10) {
         const pipeline = [
@@ -97,11 +102,37 @@ let ManagementService = class ManagementService {
         ];
         return this.managementModel.aggregate(pipeline).exec();
     }
+    formatMemberLine(member, lang) {
+        return `<p><strong>${member.name[lang]}</strong>, ${member.details[lang]}</p>`;
+    }
+    buildPresident(member) {
+        if (!member) {
+            return { text: this.emptyMultiLangText(), image: '' };
+        }
+        const text = this.buildMultiLangText((lang) => this.formatMemberLine(member, lang));
+        return { text, image: member.imageUrl || '' };
+    }
+    buildColumns(members) {
+        const mid = Math.ceil(members.length / 2);
+        const firstHalf = members.slice(0, mid);
+        const secondHalf = members.slice(mid);
+        const column1 = this.buildMultiLangText((lang) => firstHalf.map((m) => this.formatMemberLine(m, lang)).join(''));
+        const column2 = this.buildMultiLangText((lang) => secondHalf.map((m) => this.formatMemberLine(m, lang)).join(''));
+        return { column1, column2 };
+    }
+    buildMultiLangText(build) {
+        return LANGS.reduce((acc, lang) => ({ ...acc, [lang]: build(lang) }), {});
+    }
+    emptyMultiLangText() {
+        return { ro: '', ru: '', en: '' };
+    }
 };
 exports.ManagementService = ManagementService;
 exports.ManagementService = ManagementService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(management_schema_1.Management.name)),
-    __metadata("design:paramtypes", [mongoose_2.Model])
+    __param(1, (0, mongoose_1.InjectModel)(member_schema_1.Member.name)),
+    __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model])
 ], ManagementService);
 //# sourceMappingURL=management.service.js.map

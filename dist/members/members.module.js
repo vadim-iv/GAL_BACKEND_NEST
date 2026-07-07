@@ -12,12 +12,13 @@ const members_service_1 = require("./members.service");
 const members_controller_1 = require("./members.controller");
 const mongoose_1 = require("@nestjs/mongoose");
 const member_schema_1 = require("../schemas/member.schema");
+const management_module_1 = require("../management/management.module");
 let MembersModule = class MembersModule {
 };
 exports.MembersModule = MembersModule;
 exports.MembersModule = MembersModule = __decorate([
     (0, common_1.Module)({
-        imports: [mongoose_1.MongooseModule.forFeature([{ name: member_schema_1.Member.name, schema: member_schema_1.MemberSchema }])],
+        imports: [mongoose_1.MongooseModule.forFeature([{ name: member_schema_1.Member.name, schema: member_schema_1.MemberSchema }]), management_module_1.ManagementModule],
         controllers: [members_controller_1.MembersController],
         providers: [members_service_1.MembersService],
         exports: [members_service_1.MembersService]

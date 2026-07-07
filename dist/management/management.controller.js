@@ -17,8 +17,7 @@ const common_1 = require("@nestjs/common");
 const management_service_1 = require("./management.service");
 const swagger_1 = require("@nestjs/swagger");
 const auth_decorator_1 = require("../auth/decorators/auth.decorator");
-const update_management_dto_1 = require("./dto/update-management.dto");
-const management_dto_1 = require("./dto/management.dto");
+const update_main_image_dto_1 = require("./dto/update-main-image.dto");
 let ManagementController = class ManagementController {
     managementService;
     constructor(managementService) {
@@ -27,11 +26,12 @@ let ManagementController = class ManagementController {
     async getManagement() {
         return this.managementService.getManagement();
     }
-    async updateManagement(dto) {
-        return this.managementService.updateManagement(dto);
+    async updateMainImage(dto) {
+        return this.managementService.updateMainImage(dto.main_image);
     }
-    async initializeManagement(dto) {
-        return this.managementService.initializeManagement(dto);
+    async sync() {
+        await this.managementService.syncFromMembers();
+        return this.managementService.getManagement();
     }
 };
 exports.ManagementController = ManagementController;
@@ -42,35 +42,23 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], ManagementController.prototype, "getManagement", null);
 __decorate([
-    (0, common_1.Put)(),
-    (0, common_1.UsePipes)(new common_1.ValidationPipe({
-        transform: true,
-        forbidNonWhitelisted: true,
-        whitelist: true,
-        skipMissingProperties: false
-    })),
+    (0, common_1.Patch)('main-image'),
+    (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true })),
     (0, common_1.HttpCode)(200),
     (0, auth_decorator_1.Auth)(),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [update_management_dto_1.UpdateManagementDto]),
+    __metadata("design:paramtypes", [update_main_image_dto_1.UpdateMainImageDto]),
     __metadata("design:returntype", Promise)
-], ManagementController.prototype, "updateManagement", null);
+], ManagementController.prototype, "updateMainImage", null);
 __decorate([
-    (0, common_1.Post)('initialize'),
-    (0, common_1.UsePipes)(new common_1.ValidationPipe({
-        transform: true,
-        forbidNonWhitelisted: true,
-        whitelist: true,
-        skipMissingProperties: false
-    })),
+    (0, common_1.Post)('sync'),
     (0, common_1.HttpCode)(200),
     (0, auth_decorator_1.Auth)(),
-    __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [management_dto_1.ManagementDto]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
-], ManagementController.prototype, "initializeManagement", null);
+], ManagementController.prototype, "sync", null);
 exports.ManagementController = ManagementController = __decorate([
     (0, swagger_1.ApiTags)('🛠️ Management'),
     (0, common_1.Controller)('management'),

@@ -2,9 +2,13 @@ import { Model } from 'mongoose';
 import { Member } from 'src/schemas/member.schema';
 import { MemberDto } from './dto/member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
+import { ManagementService } from 'src/management/management.service';
 export declare class MembersService {
     private memberModel;
-    constructor(memberModel: Model<Member>);
+    private readonly managementService;
+    private readonly logger;
+    constructor(memberModel: Model<Member>, managementService: ManagementService);
+    private syncManagement;
     private transporter;
     private generateRandomPassword;
     private createHtmlMessageCreation;

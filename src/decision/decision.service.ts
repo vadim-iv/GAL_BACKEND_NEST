@@ -8,12 +8,16 @@ import { DecisionDto, DecisionQuestionDto } from './dto/decision.dto'
 import { UpdateDecisionDto } from './dto/update-decision-dto'
 import { AddDecisionAnswersDto } from './dto/add-answers.dto'
 import { DecisionQuestionType } from 'src/enums/decision.enum'
+import { ApprovalStatusEnum } from 'src/enums/status.enum'
+import { AwsService } from 'src/aws/aws.service'
+import { buildDecisionResultsPdf, ResultsPdfLang } from 'src/common/pdf/results-pdf.builder'
 
 @Injectable()
 export class DecisionService {
 	constructor(
 		@InjectModel(Decision.name)
-		private decisionModel: Model<DecisionDocument>
+		private decisionModel: Model<DecisionDocument>,
+		private readonly awsService: AwsService
 	) {}
 
 	async getAll(dto: GetDecisionsDto) {
@@ -133,6 +137,35 @@ export class DecisionService {
 		await decision.save()
 
 		return decision
+	}
+
+	async updateStatus(id: string, status: ApprovalStatusEnum) {
+		const decision = await this.decisionModel.findById(id)
+		if (!decision) throw new NotFoundException('Decision not found')
+
+		decision.status = status
+		await decision.save()
+
+		return decision
+	}
+
+	// For image upload
+	async generateImageUploadLink() {
+		return this.awsService.generateUploadLink('DECISIONS')
+	}
+
+	async deleteFiles(fileUrls: string[]) {
+		return this.awsService.deleteImages(fileUrls)
+	}
+
+	async generateResultsPdf(id: string, lang: ResultsPdfLang = 'ro') {
+		const decision = await this.decisionModel
+			.findById(id)
+			.populate('questions.answers.memberId', '_id name email')
+
+		if (!decision) throw new NotFoundException('Decision not found')
+
+		return buildDecisionResultsPdf(decision, lang)
 	}
 
 	// Helper to validate questions

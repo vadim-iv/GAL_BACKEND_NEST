@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var MembersService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MembersService = void 0;
 const common_1 = require("@nestjs/common");
@@ -19,10 +20,22 @@ const mongoose_2 = require("mongoose");
 const member_schema_1 = require("../schemas/member.schema");
 const argon2_1 = require("argon2");
 const nodemailer = require("nodemailer");
-let MembersService = class MembersService {
+const management_service_1 = require("../management/management.service");
+let MembersService = MembersService_1 = class MembersService {
     memberModel;
-    constructor(memberModel) {
+    managementService;
+    logger = new common_1.Logger(MembersService_1.name);
+    constructor(memberModel, managementService) {
         this.memberModel = memberModel;
+        this.managementService = managementService;
+    }
+    async syncManagement() {
+        try {
+            await this.managementService.syncFromMembers();
+        }
+        catch (err) {
+            this.logger.error('Failed to sync management from members', err);
+        }
     }
     transporter = nodemailer.createTransport({
         service: 'gmail',
@@ -97,18 +110,22 @@ let MembersService = class MembersService {
             html: this.createHtmlMessageCreation(dto.email, password),
             replyTo: process.env.SMTP_USERNAME
         });
+        await this.syncManagement();
         return member.toObject();
     }
     async update(id, dto) {
         if (!dto || Object.keys(dto).length === 0)
             throw new common_1.BadRequestException('No data provided');
         let data = dto;
-        return this.memberModel.findByIdAndUpdate(id, data, { new: true });
+        const member = await this.memberModel.findByIdAndUpdate(id, data, { new: true });
+        await this.syncManagement();
+        return member;
     }
     async delete(id) {
         const member = await this.memberModel.findByIdAndDelete(id).exec();
         if (!member)
             throw new common_1.NotFoundException('Member not found');
+        await this.syncManagement();
         return member;
     }
     async resetPassword(email) {
@@ -129,9 +146,10 @@ let MembersService = class MembersService {
     }
 };
 exports.MembersService = MembersService;
-exports.MembersService = MembersService = __decorate([
+exports.MembersService = MembersService = MembersService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(member_schema_1.Member.name)),
-    __metadata("design:paramtypes", [mongoose_2.Model])
+    __metadata("design:paramtypes", [mongoose_2.Model,
+        management_service_1.ManagementService])
 ], MembersService);
 //# sourceMappingURL=members.service.js.map

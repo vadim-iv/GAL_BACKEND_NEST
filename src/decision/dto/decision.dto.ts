@@ -64,6 +64,10 @@ export class DecisionDto {
   @Type(() => MultiLangTextDto)
   description: MultiLangTextDto;
 
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

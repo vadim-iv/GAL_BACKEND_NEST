@@ -1,9 +1,8 @@
-import { Body, Controller, Get, HttpCode, Post, Put, UsePipes, ValidationPipe } from '@nestjs/common'
+import { Body, Controller, Get, HttpCode, Patch, Post, UsePipes, ValidationPipe } from '@nestjs/common'
 import { ManagementService } from './management.service'
 import { ApiTags } from '@nestjs/swagger'
 import { Auth } from 'src/auth/decorators/auth.decorator'
-import { UpdateManagementDto } from './dto/update-management.dto'
-import { ManagementDto } from './dto/management.dto'
+import { UpdateMainImageDto } from './dto/update-main-image.dto'
 
 @ApiTags('🛠️ Management')
 @Controller('management')
@@ -15,33 +14,21 @@ export class ManagementController {
 		return this.managementService.getManagement()
 	}
 
-	@Put()
-	@UsePipes(
-		new ValidationPipe({
-			transform: true,
-			forbidNonWhitelisted: true,
-			whitelist: true,
-			skipMissingProperties: false
-		})
-	)
+	@Patch('main-image')
+	@UsePipes(new ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true }))
 	@HttpCode(200)
 	@Auth()
-	async updateManagement(@Body() dto: UpdateManagementDto) {
-		return this.managementService.updateManagement(dto)
+	async updateMainImage(@Body() dto: UpdateMainImageDto) {
+		return this.managementService.updateMainImage(dto.main_image)
 	}
 
-	@Post('initialize')
-	@UsePipes(
-		new ValidationPipe({
-			transform: true,
-			forbidNonWhitelisted: true,
-			whitelist: true,
-			skipMissingProperties: false
-		})
-	)
+	// Manually recompute the management document from the current members collection.
+	// Runs automatically after member create/update/delete; exposed here as a backfill/recovery tool.
+	@Post('sync')
 	@HttpCode(200)
 	@Auth()
-	async initializeManagement(@Body() dto: ManagementDto) {
-		return this.managementService.initializeManagement(dto)
+	async sync() {
+		await this.managementService.syncFromMembers()
+		return this.managementService.getManagement()
 	}
 }

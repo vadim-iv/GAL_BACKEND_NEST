@@ -19,10 +19,14 @@ const mongoose_2 = require("mongoose");
 const decision_schema_1 = require("../schemas/decision.schema");
 const sorting_enum_1 = require("../enums/sorting.enum");
 const decision_enum_1 = require("../enums/decision.enum");
+const aws_service_1 = require("../aws/aws.service");
+const results_pdf_builder_1 = require("../common/pdf/results-pdf.builder");
 let DecisionService = class DecisionService {
     decisionModel;
-    constructor(decisionModel) {
+    awsService;
+    constructor(decisionModel, awsService) {
         this.decisionModel = decisionModel;
+        this.awsService = awsService;
     }
     async getAll(dto) {
         const { page, limit, sort, sortDirection = sorting_enum_1.SortDirection.DESC } = dto;
@@ -114,6 +118,28 @@ let DecisionService = class DecisionService {
         await decision.save();
         return decision;
     }
+    async updateStatus(id, status) {
+        const decision = await this.decisionModel.findById(id);
+        if (!decision)
+            throw new common_1.NotFoundException('Decision not found');
+        decision.status = status;
+        await decision.save();
+        return decision;
+    }
+    async generateImageUploadLink() {
+        return this.awsService.generateUploadLink('DECISIONS');
+    }
+    async deleteFiles(fileUrls) {
+        return this.awsService.deleteImages(fileUrls);
+    }
+    async generateResultsPdf(id, lang = 'ro') {
+        const decision = await this.decisionModel
+            .findById(id)
+            .populate('questions.answers.memberId', '_id name email');
+        if (!decision)
+            throw new common_1.NotFoundException('Decision not found');
+        return (0, results_pdf_builder_1.buildDecisionResultsPdf)(decision, lang);
+    }
     validateQuestions(questions) {
         for (const question of questions) {
             if (question.type === decision_enum_1.DecisionQuestionType.SELECT ||
@@ -134,6 +160,7 @@ exports.DecisionService = DecisionService;
 exports.DecisionService = DecisionService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(decision_schema_1.Decision.name)),
-    __metadata("design:paramtypes", [mongoose_2.Model])
+    __metadata("design:paramtypes", [mongoose_2.Model,
+        aws_service_1.AwsService])
 ], DecisionService);
 //# sourceMappingURL=decision.service.js.map

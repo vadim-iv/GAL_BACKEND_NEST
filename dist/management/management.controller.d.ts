@@ -1,6 +1,5 @@
 import { ManagementService } from './management.service';
-import { UpdateManagementDto } from './dto/update-management.dto';
-import { ManagementDto } from './dto/management.dto';
+import { UpdateMainImageDto } from './dto/update-main-image.dto';
 export declare class ManagementController {
     private readonly managementService;
     constructor(managementService: ManagementService);
@@ -11,14 +10,14 @@ export declare class ManagementController {
     } & Required<{
         _id: import("mongoose").Types.ObjectId;
     }>>;
-    updateManagement(dto: UpdateManagementDto): Promise<import("mongoose").Document<unknown, {}, import("../schemas/management.schema").Management, {}> & import("../schemas/management.schema").Management & {
+    updateMainImage(dto: UpdateMainImageDto): Promise<import("mongoose").Document<unknown, {}, import("../schemas/management.schema").Management, {}> & import("../schemas/management.schema").Management & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
     } & Required<{
         _id: import("mongoose").Types.ObjectId;
     }>>;
-    initializeManagement(dto: ManagementDto): Promise<import("mongoose").Document<unknown, {}, import("../schemas/management.schema").Management, {}> & import("../schemas/management.schema").Management & {
+    sync(): Promise<import("mongoose").Document<unknown, {}, import("../schemas/management.schema").Management, {}> & import("../schemas/management.schema").Management & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;

@@ -1,12 +1,30 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
-import { Management, ManagementDocument } from 'src/schemas/management.schema'
-import { ManagementDto } from './dto/management.dto'
+import {
+	Administration,
+	Censorship,
+	Committee,
+	Executive,
+	GeneralAssembly,
+	Management,
+	ManagementDocument,
+	President
+} from 'src/schemas/management.schema'
+import { Member, TMember } from 'src/schemas/member.schema'
+import { MemberRolesEnum } from 'src/enums/member.enum'
+import { MultiLangText } from 'src/schemas/shared/text.schema'
+
+type Lang = keyof MultiLangText
+
+const LANGS: Lang[] = ['ro', 'ru', 'en']
 
 @Injectable()
 export class ManagementService {
-	constructor(@InjectModel(Management.name) private managementModel: Model<ManagementDocument>) {}
+	constructor(
+		@InjectModel(Management.name) private managementModel: Model<ManagementDocument>,
+		@InjectModel(Member.name) private memberModel: Model<TMember>
+	) {}
 
 	async getManagement() {
 		const management = await this.managementModel.findOne().exec()
@@ -18,29 +36,42 @@ export class ManagementService {
 		return management.toObject()
 	}
 
-	async updateManagement(dto: Partial<ManagementDto>) {
-		if (!dto || Object.keys(dto).length === 0) throw new BadRequestException('No data provided')
+	async updateMainImage(main_image: string) {
 		const management = await this.managementModel
-			.findOneAndUpdate({}, dto, {
-				new: true,
-				upsert: true,
-				runValidators: true
-			})
+			.findOneAndUpdate(
+				{},
+				{ $set: { main_image } },
+				{ new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+			)
 			.exec()
 
 		return management.toObject()
 	}
 
-	async initializeManagement(dto: ManagementDto) {
-		const existingManagement = await this.managementModel.findOne().exec()
+	// Recomputes every member-derived section of the singleton management document
+	// from the current members collection. main_image is left untouched.
+	async syncFromMembers() {
+		const members = await this.memberModel.find().exec()
 
-		if (existingManagement) {
-			throw new BadRequestException('Management already exists. Use update instead.')
-		}
+		const byRole = (role: MemberRolesEnum) =>
+			members.filter((m) => m.role === role).sort((a, b) => a.name.ro.localeCompare(b.name.ro))
 
-		const management = await this.managementModel.create(dto)
+		const allMembersSorted = [...members].sort((a, b) => a.name.ro.localeCompare(b.name.ro))
 
-		return management.toObject()
+		const president: President = this.buildPresident(byRole(MemberRolesEnum.PRESIDENT)[0])
+		const executive: Executive = this.buildColumns(byRole(MemberRolesEnum.EXECUTIVE_BODY))
+		const administration: Administration = this.buildColumns(byRole(MemberRolesEnum.ADMINISTRATION))
+		const committee: Committee = this.buildColumns(byRole(MemberRolesEnum.SELECTION_COMMITTEE))
+		const censorship: Censorship = this.buildColumns(byRole(MemberRolesEnum.CENSORSHIP_COMMITTEE))
+		const general_assembly: GeneralAssembly = this.buildColumns(allMembersSorted)
+
+		await this.managementModel
+			.findOneAndUpdate(
+				{},
+				{ $set: { president, executive, administration, committee, censorship, general_assembly } },
+				{ upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+			)
+			.exec()
 	}
 
 	async search(query: string, limit = 10) {
@@ -97,5 +128,42 @@ export class ManagementService {
 		]
 
 		return this.managementModel.aggregate(pipeline).exec()
+	}
+
+	private formatMemberLine(member: TMember, lang: Lang): string {
+		return `<p><strong>${member.name[lang]}</strong>, ${member.details[lang]}</p>`
+	}
+
+	private buildPresident(member: TMember | undefined): President {
+		if (!member) {
+			return { text: this.emptyMultiLangText(), image: '' }
+		}
+
+		const text = this.buildMultiLangText((lang) => this.formatMemberLine(member, lang))
+
+		return { text, image: member.imageUrl || '' }
+	}
+
+	private buildColumns(members: TMember[]): { column1: MultiLangText; column2: MultiLangText } {
+		const mid = Math.ceil(members.length / 2)
+		const firstHalf = members.slice(0, mid)
+		const secondHalf = members.slice(mid)
+
+		const column1 = this.buildMultiLangText((lang) =>
+			firstHalf.map((m) => this.formatMemberLine(m, lang)).join('')
+		)
+		const column2 = this.buildMultiLangText((lang) =>
+			secondHalf.map((m) => this.formatMemberLine(m, lang)).join('')
+		)
+
+		return { column1, column2 }
+	}
+
+	private buildMultiLangText(build: (lang: Lang) => string): MultiLangText {
+		return LANGS.reduce((acc, lang) => ({ ...acc, [lang]: build(lang) }), {} as MultiLangText)
+	}
+
+	private emptyMultiLangText(): MultiLangText {
+		return { ro: '', ru: '', en: '' }
 	}
 }

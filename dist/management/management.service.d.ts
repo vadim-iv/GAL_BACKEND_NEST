@@ -1,9 +1,10 @@
 import { Model } from 'mongoose';
 import { Management, ManagementDocument } from 'src/schemas/management.schema';
-import { ManagementDto } from './dto/management.dto';
+import { TMember } from 'src/schemas/member.schema';
 export declare class ManagementService {
     private managementModel;
-    constructor(managementModel: Model<ManagementDocument>);
+    private memberModel;
+    constructor(managementModel: Model<ManagementDocument>, memberModel: Model<TMember>);
     getManagement(): Promise<import("mongoose").Document<unknown, {}, Management, {}> & Management & {
         _id: import("mongoose").Types.ObjectId;
     } & {
@@ -11,19 +12,18 @@ export declare class ManagementService {
     } & Required<{
         _id: import("mongoose").Types.ObjectId;
     }>>;
-    updateManagement(dto: Partial<ManagementDto>): Promise<import("mongoose").Document<unknown, {}, Management, {}> & Management & {
+    updateMainImage(main_image: string): Promise<import("mongoose").Document<unknown, {}, Management, {}> & Management & {
         _id: import("mongoose").Types.ObjectId;
     } & {
         __v: number;
     } & Required<{
         _id: import("mongoose").Types.ObjectId;
     }>>;
-    initializeManagement(dto: ManagementDto): Promise<import("mongoose").Document<unknown, {}, Management, {}> & Management & {
-        _id: import("mongoose").Types.ObjectId;
-    } & {
-        __v: number;
-    } & Required<{
-        _id: import("mongoose").Types.ObjectId;
-    }>>;
+    syncFromMembers(): Promise<void>;
     search(query: string, limit?: number): Promise<any[]>;
+    private formatMemberLine;
+    private buildPresident;
+    private buildColumns;
+    private buildMultiLangText;
+    private emptyMultiLangText;
 }

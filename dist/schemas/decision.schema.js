@@ -15,6 +15,7 @@ const mongoose_2 = require("mongoose");
 const text_schema_1 = require("./shared/text.schema");
 const member_schema_1 = require("./member.schema");
 const decision_enum_1 = require("../enums/decision.enum");
+const status_enum_1 = require("../enums/status.enum");
 let DecisionOption = class DecisionOption {
     value;
     label;
@@ -77,6 +78,8 @@ exports.DecisionQuestion = DecisionQuestion = __decorate([
 let Decision = class Decision {
     title;
     description;
+    imageUrl;
+    status;
     questions;
     voteStart;
     voteEnd;
@@ -90,6 +93,14 @@ __decorate([
     (0, mongoose_1.Prop)({ type: text_schema_1.MultiLangText, required: true }),
     __metadata("design:type", text_schema_1.MultiLangText)
 ], Decision.prototype, "description", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, required: false }),
+    __metadata("design:type", String)
+], Decision.prototype, "imageUrl", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, enum: status_enum_1.ApprovalStatusEnum, default: status_enum_1.ApprovalStatusEnum.PENDING, required: true }),
+    __metadata("design:type", String)
+], Decision.prototype, "status", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: [DecisionQuestion], required: true }),
     __metadata("design:type", Array)

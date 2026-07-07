@@ -11,7 +11,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { SearchModule } from './search/search.module';
 import { ContactModule } from './contact/contact.module';
 import { MembersModule } from './members/members.module';
-import { ProjectModule } from './project/project.module';
+import { LocalCallModule } from './local-call/local-call.module';
 import { DecisionModule } from './decision/decision.module';
 
 @Module({
@@ -30,7 +30,7 @@ import { DecisionModule } from './decision/decision.module';
 		SearchModule,
 		ContactModule,
 		MembersModule,
-		ProjectModule,
+		LocalCallModule,
 		DecisionModule,
 	]
 })

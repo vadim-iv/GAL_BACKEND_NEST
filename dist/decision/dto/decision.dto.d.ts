@@ -17,6 +17,7 @@ export declare class DecisionQuestionDto {
 export declare class DecisionDto {
     title: MultiLangTextDto;
     description: MultiLangTextDto;
+    imageUrl?: string;
     questions: DecisionQuestionDto[];
     voteStart: Date;
     voteEnd: Date;

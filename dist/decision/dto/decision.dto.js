@@ -76,6 +76,7 @@ __decorate([
 class DecisionDto {
     title;
     description;
+    imageUrl;
     questions;
     voteStart;
     voteEnd;
@@ -93,6 +94,11 @@ __decorate([
     (0, class_transformer_1.Type)(() => multiLangText_dto_1.MultiLangTextDto),
     __metadata("design:type", multiLangText_dto_1.MultiLangTextDto)
 ], DecisionDto.prototype, "description", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], DecisionDto.prototype, "imageUrl", void 0);
 __decorate([
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.ArrayMinSize)(1),
