@@ -11,7 +11,11 @@ async function bootstrap() {
 	app.setGlobalPrefix('api')
 	app.use(cookieParser())
 	app.enableCors({
-		origin: ['http://localhost:3000', 'https://www.galstejaruldacilor.md'],
+		origin: [
+			'http://localhost:3000',
+			'https://www.galstejaruldacilor.md',
+			'https://gal-frontend.vercel.app'
+		],
 		credentials: true,
 		exposedHeaders: ['set-cookie'],
 		methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
