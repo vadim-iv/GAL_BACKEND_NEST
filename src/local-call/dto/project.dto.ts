@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer'
-import { IsObject, IsOptional, IsString, ValidateNested } from 'class-validator'
+import { IsEnum, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator'
 import { MultiLangTextDto } from 'src/blogs/dto/multiLangText.dto'
+import { ApprovalStatusEnum } from 'src/enums/status.enum'
 
 export class ProjectDto {
 	@IsObject()
@@ -19,4 +20,8 @@ export class ProjectDto {
 	@IsOptional()
 	@IsString()
 	imageUrl?: string
+
+	@IsOptional()
+	@IsEnum(ApprovalStatusEnum)
+	status?: ApprovalStatusEnum
 }

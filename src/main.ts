@@ -14,7 +14,7 @@ async function bootstrap() {
 		origin: ['http://localhost:3000', 'https://www.galstejaruldacilor.md'],
 		credentials: true,
 		exposedHeaders: ['set-cookie'],
-		methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+		methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 		allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
 		optionsSuccessStatus: 200
 	})

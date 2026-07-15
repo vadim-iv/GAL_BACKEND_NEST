@@ -3,7 +3,7 @@ import { HydratedDocument, Types } from 'mongoose'
 import { MultiLangText } from './shared/text.schema'
 import { Member } from './member.schema'
 import { DecisionQuestionType } from 'src/enums/decision.enum'
-import { ApprovalStatusEnum } from 'src/enums/status.enum'
+import { DecisionStatusEnum } from 'src/enums/decision-status.enum'
 
 export type DecisionDocument = HydratedDocument<Decision>
 
@@ -45,7 +45,7 @@ export class DecisionQuestion {
   answers: DecisionAnswer[]
 }
 
-@Schema()
+@Schema({ timestamps: true })
 export class Decision {
 
   @Prop({ type: MultiLangText, required: true })
@@ -57,8 +57,8 @@ export class Decision {
   @Prop({ type: String, required: false })
   imageUrl?: string
 
-  @Prop({ type: String, enum: ApprovalStatusEnum, default: ApprovalStatusEnum.PENDING, required: true })
-  status: ApprovalStatusEnum
+  @Prop({ type: String, enum: DecisionStatusEnum, default: DecisionStatusEnum.PENDING, required: true })
+  status: DecisionStatusEnum
 
   @Prop({ type: [DecisionQuestion], required: true })
   questions: DecisionQuestion[]

@@ -6,7 +6,6 @@ import {
 	Header,
 	HttpCode,
 	Param,
-	Patch,
 	Post,
 	Put,
 	Query,
@@ -21,7 +20,6 @@ import { DecisionDto } from './dto/decision.dto'
 import { MemberAuth } from 'src/auth/decorators/member-auth.decorator'
 import { AddDecisionAnswersDto } from './dto/add-answers.dto'
 import { UpdateDecisionDto } from './dto/update-decision-dto'
-import { UpdateStatusDto } from './dto/update-status.dto'
 import { DeleteImagesDto } from 'src/blogs/dto/delete-images.dto'
 import { ResultsPdfLang } from 'src/common/pdf/results-pdf.builder'
 
@@ -76,14 +74,6 @@ export class DecisionController {
 	@Auth()
 	async delete(@Param('id') id: string) {
 		return this.decisionService.delete(id)
-	}
-
-	@UsePipes(new ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true }))
-	@HttpCode(200)
-	@Patch(':id/status')
-	@Auth()
-	async updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto) {
-		return this.decisionService.updateStatus(id, dto.status)
 	}
 
 	// For image upload

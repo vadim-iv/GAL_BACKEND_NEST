@@ -8,21 +8,23 @@ import { DecisionDto, DecisionQuestionDto } from './dto/decision.dto'
 import { UpdateDecisionDto } from './dto/update-decision-dto'
 import { AddDecisionAnswersDto } from './dto/add-answers.dto'
 import { DecisionQuestionType } from 'src/enums/decision.enum'
-import { ApprovalStatusEnum } from 'src/enums/status.enum'
 import { AwsService } from 'src/aws/aws.service'
 import { buildDecisionResultsPdf, ResultsPdfLang } from 'src/common/pdf/results-pdf.builder'
+import { Member, TMember } from 'src/schemas/member.schema'
 
 @Injectable()
 export class DecisionService {
 	constructor(
 		@InjectModel(Decision.name)
 		private decisionModel: Model<DecisionDocument>,
+		@InjectModel(Member.name) private memberModel: Model<TMember>,
 		private readonly awsService: AwsService
 	) {}
 
 	async getAll(dto: GetDecisionsDto) {
-		const { page, limit, sort, sortDirection = SortDirection.DESC } = dto
+		const { page = 1, limit = 12, sort, sortDirection = SortDirection.DESC } = dto
 
+		const skip = (page - 1) * limit
 		let query = this.decisionModel.find().populate('questions.answers.memberId', '_id name email')
 
 		if (sort) {
@@ -30,14 +32,21 @@ export class DecisionService {
 			query = query.sort({ [sort]: sortOrder })
 		}
 
-		if (page && limit) {
-			const skip = (page - 1) * limit
-			query = query.skip(skip).limit(limit)
+		query = query.skip(skip).limit(limit)
+
+		const [decisions, total] = await Promise.all([query.exec(), this.decisionModel.countDocuments().exec()])
+
+		return {
+			decisions,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+				hasNextPage: page < Math.ceil(total / limit),
+				hasPrevPage: page > 1
+			}
 		}
-
-		const projects = await query.exec()
-
-		return projects
 	}
 
 	async getById(id: string) {
@@ -65,6 +74,27 @@ export class DecisionService {
 
 		const decision = await this.decisionModel.findById(id)
 		if (!decision) throw new NotFoundException('Decision not found')
+
+		// dto.questions is a full replacement array and the DTO doesn't carry
+		// each question's `answers` (the edit form never submits votes back) —
+		// findByIdAndUpdate would otherwise overwrite every question subdocument
+		// and fall back to the schema's `answers: []` default, silently
+		// wiping all existing votes. Re-attach each matched question's answers
+		// by _id before saving; a question with no matching _id is new and has
+		// no votes yet.
+		if (dto.questions) {
+			const existingAnswersById = new Map(
+				decision.questions.map((question) => [question._id.toString(), question.answers])
+			)
+
+			data = {
+				...dto,
+				questions: dto.questions.map((question) => ({
+					...question,
+					answers: (question._id && existingAnswersById.get(question._id)) || []
+				}))
+			} as unknown as UpdateDecisionDto
+		}
 
 		return this.decisionModel.findByIdAndUpdate(id, data, { new: true })
 	}
@@ -94,6 +124,16 @@ export class DecisionService {
 
 		if (!allAnswered) {
 			throw new BadRequestException('All questions must be answered')
+		}
+
+		const memberIds = [...new Set(answers.map((a) => a.memberId))]
+		const existingMembers = await this.memberModel.find({ _id: { $in: memberIds } }).select('_id').exec()
+		const existingMemberIds = new Set(existingMembers.map((m) => m._id.toString()))
+
+		for (const memberId of memberIds) {
+			if (!existingMemberIds.has(memberId)) {
+				throw new NotFoundException(`Member ${memberId} not found`)
+			}
 		}
 
 		for (const { questionId, value, memberId } of answers) {
@@ -134,16 +174,6 @@ export class DecisionService {
 			})
 		}
 
-		await decision.save()
-
-		return decision
-	}
-
-	async updateStatus(id: string, status: ApprovalStatusEnum) {
-		const decision = await this.decisionModel.findById(id)
-		if (!decision) throw new NotFoundException('Decision not found')
-
-		decision.status = status
 		await decision.save()
 
 		return decision

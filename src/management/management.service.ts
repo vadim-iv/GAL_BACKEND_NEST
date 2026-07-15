@@ -54,7 +54,7 @@ export class ManagementService {
 		const members = await this.memberModel.find().exec()
 
 		const byRole = (role: MemberRolesEnum) =>
-			members.filter((m) => m.role === role).sort((a, b) => a.name.ro.localeCompare(b.name.ro))
+			members.filter((m) => m.roles.includes(role)).sort((a, b) => a.name.ro.localeCompare(b.name.ro))
 
 		const allMembersSorted = [...members].sort((a, b) => a.name.ro.localeCompare(b.name.ro))
 
@@ -130,8 +130,14 @@ export class ManagementService {
 		return this.managementModel.aggregate(pipeline).exec()
 	}
 
-	private formatMemberLine(member: TMember, lang: Lang): string {
-		return `<p><strong>${member.name[lang]}</strong>, ${member.details[lang]}</p>`
+	// Long bio — President's own dedicated paragraph only.
+	private formatPresidentDetail(member: TMember, lang: Lang): string {
+		return member.details?.[lang] || ''
+	}
+
+	// Short blurb — used as the <li> entry everywhere else a member appears.
+	private formatShortDetail(member: TMember, lang: Lang): string {
+		return member.shortDetails[lang]
 	}
 
 	private buildPresident(member: TMember | undefined): President {
@@ -139,22 +145,31 @@ export class ManagementService {
 			return { text: this.emptyMultiLangText(), image: '' }
 		}
 
-		const text = this.buildMultiLangText((lang) => this.formatMemberLine(member, lang))
+		const text = this.buildMultiLangText((lang) => this.formatPresidentDetail(member, lang))
 
 		return { text, image: member.imageUrl || '' }
 	}
 
 	private buildColumns(members: TMember[]): { column1: MultiLangText; column2: MultiLangText } {
+		if (members.length === 0) {
+			return { column1: this.emptyMultiLangText(), column2: this.emptyMultiLangText() }
+		}
+
 		const mid = Math.ceil(members.length / 2)
 		const firstHalf = members.slice(0, mid)
 		const secondHalf = members.slice(mid)
 
-		const column1 = this.buildMultiLangText((lang) =>
-			firstHalf.map((m) => this.formatMemberLine(m, lang)).join('')
+		const column1 = this.buildMultiLangText(
+			(lang) => `<ol>${firstHalf.map((m) => `<li>${this.formatShortDetail(m, lang)}</li>`).join('')}</ol>`
 		)
-		const column2 = this.buildMultiLangText((lang) =>
-			secondHalf.map((m) => this.formatMemberLine(m, lang)).join('')
-		)
+
+		const column2 =
+			secondHalf.length > 0
+				? this.buildMultiLangText(
+						(lang) =>
+							`<ol start="${firstHalf.length + 1}">${secondHalf.map((m) => `<li>${this.formatShortDetail(m, lang)}</li>`).join('')}</ol>`
+					)
+				: this.emptyMultiLangText()
 
 		return { column1, column2 }
 	}

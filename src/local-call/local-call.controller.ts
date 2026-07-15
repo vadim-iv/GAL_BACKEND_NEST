@@ -6,7 +6,6 @@ import {
 	Header,
 	HttpCode,
 	Param,
-	Patch,
 	Post,
 	Put,
 	Query,
@@ -16,12 +15,12 @@ import {
 } from '@nestjs/common'
 import { LocalCallService } from './local-call.service'
 import { GetLocalCallsDto } from './dto/get-local-calls.dto'
+import { GetProjectsDto } from './dto/get-projects.dto'
 import { LocalCallDto } from './dto/local-call.dto'
 import { UpdateLocalCallDto } from './dto/update-local-call.dto'
 import { ProjectDto } from './dto/project.dto'
 import { UpdateProjectDto } from './dto/update-project.dto'
 import { AddLocalCallAnswersDto } from './dto/add-answers.dto'
-import { UpdateStatusDto } from './dto/update-status.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { MemberAuth } from 'src/auth/decorators/member-auth.decorator'
 import { DeleteImagesDto } from 'src/blogs/dto/delete-images.dto'
@@ -40,6 +39,12 @@ export class LocalCallController {
 	@Get(':id')
 	async getById(@Param('id') id: string) {
 		return this.localCallService.getById(id)
+	}
+
+	@Get(':id/projects')
+	@UsePipes(new ValidationPipe({ transform: true }))
+	async getProjects(@Param('id') id: string, @Query() dto: GetProjectsDto) {
+		return this.localCallService.getProjects(id, dto)
 	}
 
 	@UsePipes(new ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true }))
@@ -108,18 +113,6 @@ export class LocalCallController {
 
 	@UsePipes(new ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true }))
 	@HttpCode(200)
-	@Patch(':id/project/:projectId/status')
-	@Auth()
-	async updateProjectStatus(
-		@Param('id') id: string,
-		@Param('projectId') projectId: string,
-		@Body() dto: UpdateStatusDto
-	) {
-		return this.localCallService.updateProjectStatus(id, projectId, dto.status)
-	}
-
-	@UsePipes(new ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true }))
-	@HttpCode(200)
 	@Post('add-answers')
 	@MemberAuth()
 	async addAnswers(@Body() dto: AddLocalCallAnswersDto) {
@@ -151,12 +144,16 @@ export class LocalCallController {
 	}
 
 	@Header('Content-Type', 'application/pdf')
-	@Header('Content-Disposition', 'attachment; filename="local-call-results.pdf"')
+	@Header('Content-Disposition', 'attachment; filename="project-results.pdf"')
 	@HttpCode(200)
-	@Post(':id/results-pdf')
+	@Post(':id/project/:projectId/results-pdf')
 	@Auth()
-	async generateResultsPdf(@Param('id') id: string, @Query('lang') lang?: ResultsPdfLang) {
-		const buffer = await this.localCallService.generateResultsPdf(id, lang)
+	async generateProjectResultsPdf(
+		@Param('id') id: string,
+		@Param('projectId') projectId: string,
+		@Query('lang') lang?: ResultsPdfLang
+	) {
+		const buffer = await this.localCallService.generateProjectResultsPdf(id, projectId, lang)
 		return new StreamableFile(buffer)
 	}
 }

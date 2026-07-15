@@ -2,6 +2,10 @@
 /node_modules
 /build
 
+# TypeScript incremental build cache - machine/session-specific, committing it
+# lets a stale cache convince tsc that dist/ files exist when they don't
+*.tsbuildinfo
+
 # Logs
 logs
 *.log

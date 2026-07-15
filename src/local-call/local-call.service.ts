@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose'
 import { Model, Types } from 'mongoose'
 import { LocalCall, LocalCallDocument, LocalCallQuestion, Project } from 'src/schemas/local_call.schema'
 import { GetLocalCallsDto } from './dto/get-local-calls.dto'
+import { GetProjectsDto } from './dto/get-projects.dto'
 import { SortDirection } from 'src/enums/sorting.enum'
 import { LocalCallDto } from './dto/local-call.dto'
 import { UpdateLocalCallDto } from './dto/update-local-call.dto'
@@ -11,17 +12,20 @@ import { UpdateProjectDto } from './dto/update-project.dto'
 import { AddLocalCallAnswersDto } from './dto/add-answers.dto'
 import { ApprovalStatusEnum } from 'src/enums/status.enum'
 import { AwsService } from 'src/aws/aws.service'
-import { buildLocalCallResultsPdf, ResultsPdfLang } from 'src/common/pdf/results-pdf.builder'
+import { buildProjectResultsPdf, ResultsPdfLang } from 'src/common/pdf/results-pdf.builder'
+import { Member, TMember } from 'src/schemas/member.schema'
 
 @Injectable()
 export class LocalCallService {
 	constructor(
 		@InjectModel(LocalCall.name) private localCallModel: Model<LocalCallDocument>,
+		@InjectModel(Member.name) private memberModel: Model<TMember>,
 		private readonly awsService: AwsService
 	) {}
 
 	async getAll(dto: GetLocalCallsDto) {
-		const { page, limit, sort, sortDirection = SortDirection.DESC } = dto
+		const { page = 1, limit = 12, sort, sortDirection = SortDirection.DESC } = dto
+		const skip = (page - 1) * limit
 
 		let query = this.localCallModel.find().populate('projects.answers.memberId', '_id name email')
 
@@ -30,14 +34,24 @@ export class LocalCallService {
 			query = query.sort({ [sort]: sortOrder })
 		}
 
-		if (page && limit) {
-			const skip = (page - 1) * limit
-			query = query.skip(skip).limit(limit)
+		query = query.skip(skip).limit(limit)
+
+		const [localCalls, total] = await Promise.all([
+			query.exec(),
+			this.localCallModel.countDocuments().exec()
+		])
+
+		return {
+			localCalls: localCalls.map((localCall) => this.toResponseObject(localCall)),
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+				hasNextPage: page < Math.ceil(total / limit),
+				hasPrevPage: page > 1
+			}
 		}
-
-		const localCalls = await query.exec()
-
-		return localCalls.map((localCall) => this.toResponseObject(localCall))
 	}
 
 	async getById(id: string) {
@@ -48,6 +62,46 @@ export class LocalCallService {
 		if (!localCall) throw new NotFoundException('Local call not found')
 
 		return this.toResponseObject(localCall)
+	}
+
+	// List-oriented, paginated view of a single local call's embedded projects —
+	// no populate (member/answer detail isn't needed for a projects list row).
+	async getProjects(localCallId: string, dto: GetProjectsDto) {
+		const { page = 1, limit = 12 } = dto
+		const skip = (page - 1) * limit
+
+		const [result] = await this.localCallModel
+			.aggregate([
+				{ $match: { _id: new Types.ObjectId(localCallId) } },
+				{
+					$project: {
+						questions: 1,
+						total: { $size: '$projects' },
+						projects: { $slice: [{ $reverseArray: '$projects' }, skip, limit] }
+					}
+				}
+			])
+			.exec()
+
+		if (!result) throw new NotFoundException('Local call not found')
+
+		const total = result.total as number
+		const projects = (result.projects as Project[]).map((project) => ({
+			...project,
+			averageMark: this.calculateAverageMark(result.questions, project)
+		}))
+
+		return {
+			projects,
+			pagination: {
+				page,
+				limit,
+				total,
+				totalPages: Math.ceil(total / limit),
+				hasNextPage: page < Math.ceil(total / limit),
+				hasPrevPage: page > 1
+			}
+		}
 	}
 
 	async create(dto: LocalCallDto) {
@@ -123,20 +177,6 @@ export class LocalCallService {
 		return localCall.toObject()
 	}
 
-	async updateProjectStatus(localCallId: string, projectId: string, status: ApprovalStatusEnum) {
-		const localCall = await this.localCallModel.findById(localCallId)
-		if (!localCall) throw new NotFoundException('Local call not found')
-
-		const project = localCall.projects.find((p) => p._id.toString() === projectId)
-		if (!project) throw new NotFoundException('Project not found')
-
-		project.status = status
-
-		await localCall.save()
-
-		return localCall.toObject()
-	}
-
 	// Add a member's answers to a specific project's questions (inherited from the parent local call)
 	async addAnswers(dto: AddLocalCallAnswersDto) {
 		const { localCallId, projectId, answers } = dto
@@ -164,6 +204,16 @@ export class LocalCallService {
 		const allAnswered = questionIds.every((id) => answeredIds.includes(id))
 		if (!allAnswered) {
 			throw new BadRequestException('You must answer all questions to submit.')
+		}
+
+		const memberIds = [...new Set(answers.map((a) => a.memberId))]
+		const existingMembers = await this.memberModel.find({ _id: { $in: memberIds } }).select('_id').exec()
+		const existingMemberIds = new Set(existingMembers.map((m) => m._id.toString()))
+
+		for (const memberId of memberIds) {
+			if (!existingMemberIds.has(memberId)) {
+				throw new NotFoundException(`Member ${memberId} not found`)
+			}
 		}
 
 		for (const { questionId, answer, memberId } of answers) {
@@ -209,14 +259,17 @@ export class LocalCallService {
 		return this.awsService.deleteImages(fileUrls)
 	}
 
-	async generateResultsPdf(id: string, lang: ResultsPdfLang = 'ro') {
+	async generateProjectResultsPdf(id: string, projectId: string, lang: ResultsPdfLang = 'ro') {
 		const localCall = await this.localCallModel
 			.findById(id)
 			.populate('projects.answers.memberId', '_id name email')
 
 		if (!localCall) throw new NotFoundException('Local call not found')
 
-		return buildLocalCallResultsPdf(localCall, lang)
+		const project = localCall.projects.find((p) => p._id.toString() === projectId)
+		if (!project) throw new NotFoundException('Project not found')
+
+		return buildProjectResultsPdf(localCall, project, lang)
 	}
 
 	private toResponseObject(localCall: LocalCallDocument) {

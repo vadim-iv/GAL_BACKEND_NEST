@@ -3,6 +3,7 @@ import {
 	IsArray,
 	IsDate,
 	IsInt,
+	IsMongoId,
 	IsObject,
 	IsOptional,
 	IsString,
@@ -14,6 +15,13 @@ import {
 import { MultiLangTextDto } from 'src/blogs/dto/multiLangText.dto'
 
 export class LocalCallQuestionDto {
+	// Present when updating an existing question (assigned by the server on create) —
+	// without this, the whitelist validator rejects the whole request with
+	// "questions.N.property _id should not exist" on every edit of an existing local call.
+	@IsOptional()
+	@IsMongoId()
+	_id?: string
+
 	@IsObject()
 	@ValidateNested()
 	@Type(() => MultiLangTextDto)

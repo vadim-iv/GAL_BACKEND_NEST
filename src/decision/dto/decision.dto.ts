@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { MultiLangTextDto } from 'src/blogs/dto/multiLangText.dto';
 import { DecisionQuestionType } from 'src/enums/decision.enum';
+import { DecisionStatusEnum } from 'src/enums/decision-status.enum';
 
 export class DecisionOptionDto {
   @IsString()
@@ -32,6 +33,13 @@ export class DecisionAnswerDto {
 }
 
 export class DecisionQuestionDto {
+  // Present when updating an existing question (assigned by the server on create) —
+  // without this, the whitelist validator rejects the whole request with
+  // "questions.N.property _id should not exist" on every edit of an existing decision.
+  @IsOptional()
+  @IsMongoId()
+  _id?: string;
+
   @IsObject()
   @ValidateNested()
   @Type(() => MultiLangTextDto)
@@ -67,6 +75,10 @@ export class DecisionDto {
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @IsOptional()
+  @IsEnum(DecisionStatusEnum)
+  status?: DecisionStatusEnum;
 
   @IsArray()
   @ArrayMinSize(1)

@@ -13,5 +13,10 @@
       "dest": "dist/main.js",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     }
-  ]
+  ],
+  "functions": {
+    "dist/main.js": {
+      "includeFiles": "dist/common/pdf/assets/**"
+    }
+  }
 }
