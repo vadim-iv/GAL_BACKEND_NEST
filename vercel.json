@@ -4,7 +4,10 @@
   "builds": [
     {
       "src": "dist/main.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "dist/common/pdf/assets/**"
+      }
     }
   ],
   "routes": [
@@ -13,10 +16,5 @@
       "dest": "dist/main.js",
       "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     }
-  ],
-  "functions": {
-    "dist/main.js": {
-      "includeFiles": "dist/common/pdf/assets/**"
-    }
-  }
+  ]
 }
