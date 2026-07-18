@@ -11,7 +11,6 @@ import {
 	ValidationPipe
 } from '@nestjs/common'
 import { MembersService } from './members.service'
-import { MemberSeedService } from './member-seed.service'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { MemberDto } from './dto/member.dto'
 import { UpdateMemberDto } from './dto/update-member.dto'
@@ -22,10 +21,7 @@ import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto'
 
 @Controller('members')
 export class MembersController {
-	constructor(
-		private readonly membersService: MembersService,
-		private readonly memberSeedService: MemberSeedService
-	) {}
+	constructor(private readonly membersService: MembersService) {}
 
 	@Get()
 	findAll() {
@@ -77,16 +73,6 @@ export class MembersController {
 	@Auth()
 	async generateImageUploadLink() {
 		return this.membersService.generateImageUploadLink()
-	}
-
-	// TEMPORARY: manual trigger for the one-time member data migration — see
-	// member-seed.service.ts. Remove this endpoint along with that service once
-	// the real DB has been seeded.
-	@HttpCode(200)
-	@Post('run-seed')
-	@Auth()
-	async runSeed() {
-		return this.memberSeedService.seed()
 	}
 
 	@UsePipes(new ValidationPipe({ transform: true }))

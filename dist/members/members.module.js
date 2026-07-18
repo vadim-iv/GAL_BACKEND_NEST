@@ -9,7 +9,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MembersModule = void 0;
 const common_1 = require("@nestjs/common");
 const members_service_1 = require("./members.service");
-const member_seed_service_1 = require("./member-seed.service");
 const members_controller_1 = require("./members.controller");
 const mongoose_1 = require("@nestjs/mongoose");
 const member_schema_1 = require("../schemas/member.schema");
@@ -26,7 +25,7 @@ exports.MembersModule = MembersModule = __decorate([
             aws_module_1.AwsModule
         ],
         controllers: [members_controller_1.MembersController],
-        providers: [members_service_1.MembersService, member_seed_service_1.MemberSeedService],
+        providers: [members_service_1.MembersService],
         exports: [members_service_1.MembersService]
     })
 ], MembersModule);
