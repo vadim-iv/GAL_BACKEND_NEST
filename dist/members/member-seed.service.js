@@ -28,7 +28,7 @@ let MemberSeedService = MemberSeedService_1 = class MemberSeedService {
         this.memberModel = memberModel;
         this.managementService = managementService;
     }
-    async onModuleInit() {
+    async seed() {
         await this.ensureEmailIndexIsSparse();
         const existingCount = await this.memberModel.countDocuments();
         this.logger.warn(`[member-seed] Wiping ${existingCount} existing member(s) and inserting ${member_seed_data_1.MEMBER_SEED_DATA.length} seed member(s)...`);
@@ -38,6 +38,10 @@ let MemberSeedService = MemberSeedService_1 = class MemberSeedService {
         }
         await this.managementService.syncFromMembers();
         this.logger.warn('[member-seed] Done.');
+        return {
+            wiped: existingCount,
+            inserted: member_seed_data_1.MEMBER_SEED_DATA.length
+        };
     }
     async ensureEmailIndexIsSparse() {
         const indexes = await this.memberModel.collection.indexes();

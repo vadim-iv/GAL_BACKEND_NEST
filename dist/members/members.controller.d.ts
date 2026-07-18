@@ -1,4 +1,5 @@
 import { MembersService } from './members.service';
+import { MemberSeedService } from './member-seed.service';
 import { MemberDto } from './dto/member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
 import { DeleteImagesDto } from 'src/blogs/dto/delete-images.dto';
@@ -6,7 +7,8 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 export declare class MembersController {
     private readonly membersService;
-    constructor(membersService: MembersService);
+    private readonly memberSeedService;
+    constructor(membersService: MembersService, memberSeedService: MemberSeedService);
     findAll(): Promise<(import("mongoose").Document<unknown, {}, import("../schemas/member.schema").Member, {}> & import("../schemas/member.schema").Member & {
         _id: import("mongoose").Types.ObjectId;
     } & {
@@ -42,6 +44,10 @@ export declare class MembersController {
         uploadUrl: string;
         publicUrl: string;
         key: string;
+    }>;
+    runSeed(): Promise<{
+        wiped: number;
+        inserted: number;
     }>;
     deleteFiles(dto: DeleteImagesDto): Promise<{
         success: boolean;

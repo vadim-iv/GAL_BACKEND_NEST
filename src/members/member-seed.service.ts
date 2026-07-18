@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import { Member } from 'src/schemas/member.schema'
@@ -6,12 +6,17 @@ import { ManagementService } from 'src/management/management.service'
 import { MEMBER_SEED_DATA } from './member-seed.data'
 
 // TEMPORARY one-time data migration: wipes every member and replaces them with
-// the hardcoded list in member-seed.data.ts, built from membri.txt. Runs
-// automatically on app boot (no local access to the target DB to run this as a
-// standalone script instead) — remove this service, its registration in
-// MembersModule, and member-seed.data.ts once the real DB has been seeded.
+// the hardcoded list in member-seed.data.ts, built from membri.txt. Triggered
+// manually via POST /members/run-seed (no local access to the target DB to run
+// this as a standalone script instead) — running it at boot (onModuleInit) was
+// tried first but blocks NestJS's bootstrap long enough that Vercel's
+// serverless runtime kills the process before app.listen() is ever reached
+// ("No exports found in module... did you forget to export a function or a
+// server?"), crashing every route. Remove this service, its registration in
+// MembersModule, the controller endpoint, and member-seed.data.ts once the
+// real DB has been seeded.
 @Injectable()
-export class MemberSeedService implements OnModuleInit {
+export class MemberSeedService {
 	private readonly logger = new Logger(MemberSeedService.name)
 
 	constructor(
@@ -19,7 +24,7 @@ export class MemberSeedService implements OnModuleInit {
 		private readonly managementService: ManagementService
 	) {}
 
-	async onModuleInit() {
+	async seed() {
 		await this.ensureEmailIndexIsSparse()
 
 		const existingCount = await this.memberModel.countDocuments()
@@ -43,6 +48,11 @@ export class MemberSeedService implements OnModuleInit {
 		await this.managementService.syncFromMembers()
 
 		this.logger.warn('[member-seed] Done.')
+
+		return {
+			wiped: existingCount,
+			inserted: MEMBER_SEED_DATA.length
+		}
 	}
 
 	// The `email` field's unique index predates the optional-email feature (added

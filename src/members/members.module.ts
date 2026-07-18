@@ -15,7 +15,8 @@ import { AwsModule } from 'src/aws/aws.module'
 	],
 	controllers: [MembersController],
 	// TEMPORARY: MemberSeedService — remove once the one-time member import has run
-	// against the target DB (see member-seed.service.ts).
+	// against the target DB (see member-seed.service.ts and the POST
+	// /members/run-seed endpoint in members.controller.ts).
 	providers: [MembersService, MemberSeedService],
   exports: [MembersService]
 })

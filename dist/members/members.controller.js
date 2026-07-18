@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MembersController = void 0;
 const common_1 = require("@nestjs/common");
 const members_service_1 = require("./members.service");
+const member_seed_service_1 = require("./member-seed.service");
 const auth_decorator_1 = require("../auth/decorators/auth.decorator");
 const member_dto_1 = require("./dto/member.dto");
 const update_member_dto_1 = require("./dto/update-member.dto");
@@ -24,8 +25,10 @@ const forgot_password_dto_1 = require("./dto/forgot-password.dto");
 const confirm_password_reset_dto_1 = require("./dto/confirm-password-reset.dto");
 let MembersController = class MembersController {
     membersService;
-    constructor(membersService) {
+    memberSeedService;
+    constructor(membersService, memberSeedService) {
         this.membersService = membersService;
+        this.memberSeedService = memberSeedService;
     }
     findAll() {
         return this.membersService.findAll();
@@ -47,6 +50,9 @@ let MembersController = class MembersController {
     }
     async generateImageUploadLink() {
         return this.membersService.generateImageUploadLink();
+    }
+    async runSeed() {
+        return this.memberSeedService.seed();
     }
     async deleteFiles(dto) {
         return this.membersService.deleteMemberImages(dto.imageUrls);
@@ -126,6 +132,14 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], MembersController.prototype, "generateImageUploadLink", null);
 __decorate([
+    (0, common_1.HttpCode)(200),
+    (0, common_1.Post)('run-seed'),
+    (0, auth_decorator_1.Auth)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], MembersController.prototype, "runSeed", null);
+__decorate([
     (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true })),
     (0, common_1.HttpCode)(200),
     (0, common_1.Post)('delete-files'),
@@ -164,6 +178,7 @@ __decorate([
 ], MembersController.prototype, "confirmPasswordReset", null);
 exports.MembersController = MembersController = __decorate([
     (0, common_1.Controller)('members'),
-    __metadata("design:paramtypes", [members_service_1.MembersService])
+    __metadata("design:paramtypes", [members_service_1.MembersService,
+        member_seed_service_1.MemberSeedService])
 ], MembersController);
 //# sourceMappingURL=members.controller.js.map
