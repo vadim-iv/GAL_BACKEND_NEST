@@ -3,16 +3,19 @@ import { Member } from 'src/schemas/member.schema';
 import { MemberDto } from './dto/member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
 import { ManagementService } from 'src/management/management.service';
+import { AwsService } from 'src/aws/aws.service';
 export declare class MembersService {
     private memberModel;
     private readonly managementService;
+    private readonly awsService;
     private readonly logger;
-    constructor(memberModel: Model<Member>, managementService: ManagementService);
+    constructor(memberModel: Model<Member>, managementService: ManagementService, awsService: AwsService);
     private syncManagement;
     private transporter;
     private generateRandomPassword;
     private createHtmlMessageCreation;
     private createHtmlMessageReset;
+    private createHtmlMessageResetLink;
     findAll(): Promise<(import("mongoose").Document<unknown, {}, Member, {}> & Member & {
         _id: import("mongoose").Types.ObjectId;
     } & {
@@ -28,6 +31,7 @@ export declare class MembersService {
     } & {
         __v: number;
     }) | null>;
+    private provisionAccountForEmail;
     create(dto: MemberDto): Promise<Member & {
         _id: import("mongoose").Types.ObjectId;
     } & {
@@ -45,5 +49,20 @@ export declare class MembersService {
     }>;
     resetPassword(email: string): Promise<{
         message: string;
+    }>;
+    forgotPassword(email: string): Promise<{
+        message: string;
+    }>;
+    confirmPasswordReset(token: string): Promise<{
+        message: string;
+    }>;
+    generateImageUploadLink(): Promise<{
+        success: boolean;
+        uploadUrl: string;
+        publicUrl: string;
+        key: string;
+    }>;
+    deleteMemberImages(imageUrls: string[]): Promise<{
+        success: boolean;
     }>;
 }

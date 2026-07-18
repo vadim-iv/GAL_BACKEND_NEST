@@ -21,7 +21,9 @@ export declare class ManagementService {
     }>>;
     syncFromMembers(): Promise<void>;
     search(query: string, limit?: number): Promise<any[]>;
-    private formatMemberLine;
+    private toPlainText;
+    private formatPresidentDetail;
+    private formatShortDetail;
     private buildPresident;
     private buildColumns;
     private buildMultiLangText;

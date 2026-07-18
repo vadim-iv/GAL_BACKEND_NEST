@@ -21,26 +21,37 @@ const sorting_enum_1 = require("../enums/sorting.enum");
 const decision_enum_1 = require("../enums/decision.enum");
 const aws_service_1 = require("../aws/aws.service");
 const results_pdf_builder_1 = require("../common/pdf/results-pdf.builder");
+const member_schema_1 = require("../schemas/member.schema");
 let DecisionService = class DecisionService {
     decisionModel;
+    memberModel;
     awsService;
-    constructor(decisionModel, awsService) {
+    constructor(decisionModel, memberModel, awsService) {
         this.decisionModel = decisionModel;
+        this.memberModel = memberModel;
         this.awsService = awsService;
     }
     async getAll(dto) {
-        const { page, limit, sort, sortDirection = sorting_enum_1.SortDirection.DESC } = dto;
+        const { page = 1, limit = 12, sort, sortDirection = sorting_enum_1.SortDirection.DESC } = dto;
+        const skip = (page - 1) * limit;
         let query = this.decisionModel.find().populate('questions.answers.memberId', '_id name email');
         if (sort) {
             const sortOrder = sortDirection === sorting_enum_1.SortDirection.ASC ? 1 : -1;
             query = query.sort({ [sort]: sortOrder });
         }
-        if (page && limit) {
-            const skip = (page - 1) * limit;
-            query = query.skip(skip).limit(limit);
-        }
-        const projects = await query.exec();
-        return projects;
+        query = query.skip(skip).limit(limit);
+        const [decisions, total] = await Promise.all([query.exec(), this.decisionModel.countDocuments().exec()]);
+        return {
+            decisions,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit),
+                hasPrevPage: page > 1
+            }
+        };
     }
     async getById(id) {
         const decision = await this.decisionModel
@@ -65,6 +76,16 @@ let DecisionService = class DecisionService {
         const decision = await this.decisionModel.findById(id);
         if (!decision)
             throw new common_1.NotFoundException('Decision not found');
+        if (dto.questions) {
+            const existingAnswersById = new Map(decision.questions.map((question) => [question._id.toString(), question.answers]));
+            data = {
+                ...dto,
+                questions: dto.questions.map((question) => ({
+                    ...question,
+                    answers: (question._id && existingAnswersById.get(question._id)) || []
+                }))
+            };
+        }
         return this.decisionModel.findByIdAndUpdate(id, data, { new: true });
     }
     async delete(id) {
@@ -88,7 +109,15 @@ let DecisionService = class DecisionService {
         if (!allAnswered) {
             throw new common_1.BadRequestException('All questions must be answered');
         }
-        for (const { questionId, value, memberId } of answers) {
+        const memberIds = [...new Set(answers.map((a) => a.memberId))];
+        const existingMembers = await this.memberModel.find({ _id: { $in: memberIds } }).select('_id').exec();
+        const existingMemberIds = new Set(existingMembers.map((m) => m._id.toString()));
+        for (const memberId of memberIds) {
+            if (!existingMemberIds.has(memberId)) {
+                throw new common_1.NotFoundException(`Member ${memberId} not found`);
+            }
+        }
+        for (const { questionId, value, values, memberId } of answers) {
             const question = decision.questions.find((q) => q._id.toString() === questionId);
             if (!question) {
                 throw new common_1.NotFoundException(`Question ${questionId} not found`);
@@ -97,10 +126,18 @@ let DecisionService = class DecisionService {
             if (alreadyAnswered) {
                 throw new common_1.BadRequestException(`Member already answered question ${questionId}`);
             }
-            if (question.type === decision_enum_1.DecisionQuestionType.RADIO ||
-                question.type === decision_enum_1.DecisionQuestionType.SELECT) {
+            if (question.type === decision_enum_1.DecisionQuestionType.RADIO) {
                 const optionExists = question.options?.some((opt) => opt.value === value);
                 if (!optionExists) {
+                    throw new common_1.BadRequestException(`Invalid option for question ${questionId}`);
+                }
+            }
+            if (question.type === decision_enum_1.DecisionQuestionType.CHECKBOX) {
+                if (!values || values.length === 0) {
+                    throw new common_1.BadRequestException(`At least one option is required for question ${questionId}`);
+                }
+                const allOptionsExist = values.every((v) => question.options?.some((opt) => opt.value === v));
+                if (!allOptionsExist) {
                     throw new common_1.BadRequestException(`Invalid option for question ${questionId}`);
                 }
             }
@@ -112,17 +149,9 @@ let DecisionService = class DecisionService {
             question.answers = question.answers || [];
             question.answers.push({
                 memberId: new mongoose_2.Types.ObjectId(memberId),
-                value
+                ...(question.type === decision_enum_1.DecisionQuestionType.CHECKBOX ? { values } : { value })
             });
         }
-        await decision.save();
-        return decision;
-    }
-    async updateStatus(id, status) {
-        const decision = await this.decisionModel.findById(id);
-        if (!decision)
-            throw new common_1.NotFoundException('Decision not found');
-        decision.status = status;
         await decision.save();
         return decision;
     }
@@ -142,7 +171,7 @@ let DecisionService = class DecisionService {
     }
     validateQuestions(questions) {
         for (const question of questions) {
-            if (question.type === decision_enum_1.DecisionQuestionType.SELECT ||
+            if (question.type === decision_enum_1.DecisionQuestionType.CHECKBOX ||
                 question.type === decision_enum_1.DecisionQuestionType.RADIO) {
                 if (!question.options || question.options.length === 0) {
                     throw new common_1.BadRequestException(`Options are required for question type ${question.type}`);
@@ -160,7 +189,9 @@ exports.DecisionService = DecisionService;
 exports.DecisionService = DecisionService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(decision_schema_1.Decision.name)),
+    __param(1, (0, mongoose_1.InjectModel)(member_schema_1.Member.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model,
         aws_service_1.AwsService])
 ], DecisionService);
 //# sourceMappingURL=decision.service.js.map

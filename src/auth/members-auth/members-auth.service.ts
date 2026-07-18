@@ -64,7 +64,11 @@ export class MembersAuthService {
 	private async validateMember(dto: MemberAuthDto) {
 		const member = await this.membersService.getByEmail(dto.email)
 
-		if (!member) throw new NotFoundException('User not found')
+		// A member with an email always has a password (provisionAccountForEmail
+		// sets both together) — but a member with neither has no credential to
+		// compare against at all, so this must be rejected explicitly rather than
+		// passed to verify() as undefined.
+		if (!member || !member.password) throw new NotFoundException('User not found')
 
 		const isValid = await verify(member.password, dto.password)
 

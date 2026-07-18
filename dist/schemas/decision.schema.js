@@ -15,7 +15,7 @@ const mongoose_2 = require("mongoose");
 const text_schema_1 = require("./shared/text.schema");
 const member_schema_1 = require("./member.schema");
 const decision_enum_1 = require("../enums/decision.enum");
-const status_enum_1 = require("../enums/status.enum");
+const decision_status_enum_1 = require("../enums/decision-status.enum");
 let DecisionOption = class DecisionOption {
     value;
     label;
@@ -35,6 +35,7 @@ exports.DecisionOption = DecisionOption = __decorate([
 let DecisionAnswer = class DecisionAnswer {
     memberId;
     value;
+    values;
 };
 exports.DecisionAnswer = DecisionAnswer;
 __decorate([
@@ -42,9 +43,13 @@ __decorate([
     __metadata("design:type", mongoose_2.Types.ObjectId)
 ], DecisionAnswer.prototype, "memberId", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: String, required: true }),
+    (0, mongoose_1.Prop)({ type: String, required: false }),
     __metadata("design:type", String)
 ], DecisionAnswer.prototype, "value", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: [String], required: false }),
+    __metadata("design:type", Array)
+], DecisionAnswer.prototype, "values", void 0);
 exports.DecisionAnswer = DecisionAnswer = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], DecisionAnswer);
@@ -98,7 +103,7 @@ __decorate([
     __metadata("design:type", String)
 ], Decision.prototype, "imageUrl", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: String, enum: status_enum_1.ApprovalStatusEnum, default: status_enum_1.ApprovalStatusEnum.PENDING, required: true }),
+    (0, mongoose_1.Prop)({ type: String, enum: decision_status_enum_1.DecisionStatusEnum, default: decision_status_enum_1.DecisionStatusEnum.PENDING, required: true }),
     __metadata("design:type", String)
 ], Decision.prototype, "status", void 0);
 __decorate([
@@ -114,7 +119,7 @@ __decorate([
     __metadata("design:type", Date)
 ], Decision.prototype, "voteEnd", void 0);
 exports.Decision = Decision = __decorate([
-    (0, mongoose_1.Schema)()
+    (0, mongoose_1.Schema)({ timestamps: true })
 ], Decision);
 exports.DecisionSchema = mongoose_1.SchemaFactory.createForClass(Decision);
 //# sourceMappingURL=decision.schema.js.map

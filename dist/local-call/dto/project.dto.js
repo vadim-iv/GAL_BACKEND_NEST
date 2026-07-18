@@ -13,11 +13,13 @@ exports.ProjectDto = void 0;
 const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const multiLangText_dto_1 = require("../../blogs/dto/multiLangText.dto");
+const status_enum_1 = require("../../enums/status.enum");
 class ProjectDto {
     title;
     description;
     pdfUrl;
     imageUrl;
+    status;
 }
 exports.ProjectDto = ProjectDto;
 __decorate([
@@ -41,4 +43,9 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], ProjectDto.prototype, "imageUrl", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(status_enum_1.ApprovalStatusEnum),
+    __metadata("design:type", String)
+], ProjectDto.prototype, "status", void 0);
 //# sourceMappingURL=project.dto.js.map

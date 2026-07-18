@@ -1,7 +1,7 @@
 import { HydratedDocument, Types } from 'mongoose';
 import { MultiLangText } from './shared/text.schema';
 import { DecisionQuestionType } from 'src/enums/decision.enum';
-import { ApprovalStatusEnum } from 'src/enums/status.enum';
+import { DecisionStatusEnum } from 'src/enums/decision-status.enum';
 export type DecisionDocument = HydratedDocument<Decision>;
 export declare class DecisionOption {
     value: string;
@@ -9,7 +9,8 @@ export declare class DecisionOption {
 }
 export declare class DecisionAnswer {
     memberId: Types.ObjectId;
-    value: string;
+    value?: string;
+    values?: string[];
 }
 export declare class DecisionQuestion {
     _id: Types.ObjectId;
@@ -22,7 +23,7 @@ export declare class Decision {
     title: MultiLangText;
     description: MultiLangText;
     imageUrl?: string;
-    status: ApprovalStatusEnum;
+    status: DecisionStatusEnum;
     questions: DecisionQuestion[];
     voteStart: Date;
     voteEnd: Date;

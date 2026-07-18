@@ -12,6 +12,7 @@ const HEADER_LOGO_SIZE = 24
 const HEADER_TOP = 30
 const STAT_TILE_HEIGHT = 44
 const STAT_TILE_PADDING = 10
+const ORGANIZATION_NAME = 'GAL Stejarul Dacilor'
 
 export function createDocument(): PDFKit.PDFDocument {
 	return new PDFDocument({ size: PAGE.size, margins: PAGE.margins, bufferPages: true })
@@ -28,7 +29,7 @@ export function registerFonts(doc: PDFKit.PDFDocument): void {
 // before any 'pageAdded' listener can be attached) and from a 'pageAdded'
 // handler (every page after that, including ones pdfkit creates implicitly on
 // content overflow).
-export function drawHeader(doc: PDFKit.PDFDocument, titleText: string): void {
+export function drawHeader(doc: PDFKit.PDFDocument): void {
 	const x = PAGE.margins.left
 	const y = HEADER_TOP
 
@@ -42,7 +43,7 @@ export function drawHeader(doc: PDFKit.PDFDocument, titleText: string): void {
 		.font(FONT_FAMILY.semiBold)
 		.fontSize(FONT_SIZE.subtitle)
 		.fillColor(COLORS.green700)
-		.text(titleText, x + HEADER_LOGO_SIZE + 10, y + HEADER_LOGO_SIZE / 2 - 6, {
+		.text(ORGANIZATION_NAME, x + HEADER_LOGO_SIZE + 10, y + HEADER_LOGO_SIZE / 2 - 6, {
 			width: doc.page.width - PAGE.margins.left - PAGE.margins.right - HEADER_LOGO_SIZE - 10,
 			height: doc.currentLineHeight(),
 			ellipsis: true
@@ -102,12 +103,52 @@ export function drawCard(doc: PDFKit.PDFDocument, x: number, y: number, width: n
 const STAT_TILE_TOP_PAD = 8
 const STAT_TILE_LABEL_VALUE_GAP = 5
 const STAT_TILE_BOTTOM_PAD = 8
+const STAT_TILE_VALUE_SECONDARY_GAP = 4
 
+// Distance in points from the top of a text box down to its baseline, for
+// whichever font/size is currently active on `doc`. Mirrors pdfkit's own
+// internal usage of this exact metric (see its `list()` implementation) —
+// `ascender` is expressed in 1/1000-em units, same convention pdfkit's own
+// Font#lineHeight() uses. Not exposed as a public pdfkit API, hence the cast;
+// this is the only reliable way to align baselines between two different font
+// sizes/weights, since "bottom of line box" (heightOfString/currentLineHeight)
+// includes leading that isn't proportional to font size the same way for both.
+function fontBaselineOffset(doc: PDFKit.PDFDocument): number {
+	const internal = doc as unknown as { _font: { ascender: number }; _fontSize: number }
+	return (internal._font.ascender / 1000) * internal._fontSize
+}
+
+// True when value + a small gap + secondaryValue fit on one line within
+// innerWidth at their respective font sizes — if not, the note is drawn on its
+// own line below the value instead (see drawStatTile), which needs extra
+// reserved height.
+function secondaryValueFitsInline(
+	doc: PDFKit.PDFDocument,
+	innerWidth: number,
+	value: string,
+	secondaryValue: string
+): boolean {
+	doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.statValue)
+	const valueWidth = doc.widthOfString(value)
+	doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.statValueSecondary)
+	const secondaryWidth = doc.widthOfString(secondaryValue)
+	return valueWidth + STAT_TILE_VALUE_SECONDARY_GAP + secondaryWidth <= innerWidth
+}
+
+// secondaryValue is an optional deemphasized note drawn right after the main
+// value (e.g. "12 (and 2 deleted members)") — smaller and in a muted color so it
+// still reads as secondary rather than part of the headline number.
 // Exposed separately from drawStatTile so callers can lay out sibling elements
 // (e.g. vertically centering the status pill) against the tile's real height
 // before anything is drawn — height depends on how much the value text wraps
 // (a date range can take 1 or 2 lines), so it can't be assumed up front.
-export function measureStatTileHeight(doc: PDFKit.PDFDocument, width: number, label: string, value: string): number {
+export function measureStatTileHeight(
+	doc: PDFKit.PDFDocument,
+	width: number,
+	label: string,
+	value: string,
+	secondaryValue?: string
+): number {
 	const innerWidth = width - STAT_TILE_PADDING * 2
 
 	doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.statLabel)
@@ -116,9 +157,17 @@ export function measureStatTileHeight(doc: PDFKit.PDFDocument, width: number, la
 	doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.statValue)
 	const valueHeight = doc.heightOfString(value, { width: innerWidth })
 
+	// If the note doesn't fit next to the value, it wraps below — reserve room
+	// for it at its own (smaller) font size instead of the value's.
+	let wrappedSecondaryHeight = 0
+	if (secondaryValue && !secondaryValueFitsInline(doc, innerWidth, value, secondaryValue)) {
+		doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.statValueSecondary)
+		wrappedSecondaryHeight = doc.heightOfString(secondaryValue, { width: innerWidth })
+	}
+
 	return Math.max(
 		STAT_TILE_HEIGHT,
-		STAT_TILE_TOP_PAD + labelHeight + STAT_TILE_LABEL_VALUE_GAP + valueHeight + STAT_TILE_BOTTOM_PAD
+		STAT_TILE_TOP_PAD + labelHeight + STAT_TILE_LABEL_VALUE_GAP + valueHeight + wrappedSecondaryHeight + STAT_TILE_BOTTOM_PAD
 	)
 }
 
@@ -128,7 +177,8 @@ export function drawStatTile(
 	y: number,
 	width: number,
 	label: string,
-	value: string
+	value: string,
+	secondaryValue?: string
 ): number {
 	const innerWidth = width - STAT_TILE_PADDING * 2
 	const topPad = STAT_TILE_TOP_PAD
@@ -137,7 +187,7 @@ export function drawStatTile(
 	doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.statLabel)
 	const labelHeight = doc.heightOfString(label, { width: innerWidth })
 
-	const height = measureStatTileHeight(doc, width, label, value)
+	const height = measureStatTileHeight(doc, width, label, value, secondaryValue)
 
 	doc.roundedRect(x, y, width, height, 6).fill(COLORS.gray300)
 
@@ -147,11 +197,38 @@ export function drawStatTile(
 		.fillColor(COLORS.gray600)
 		.text(label, x + STAT_TILE_PADDING, y + topPad, { width: innerWidth })
 
-	doc
-		.font(FONT_FAMILY.semiBold)
-		.fontSize(FONT_SIZE.statValue)
-		.fillColor(COLORS.green700)
-		.text(value, x + STAT_TILE_PADDING, y + topPad + labelHeight + gap, { width: innerWidth })
+	doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.statValue)
+	const valueY = y + topPad + labelHeight + gap
+	const valueHeight = doc.heightOfString(value, { width: innerWidth })
+	doc.fillColor(COLORS.green700).text(value, x + STAT_TILE_PADDING, valueY, { width: innerWidth })
+
+	if (secondaryValue) {
+		const fitsInline = secondaryValueFitsInline(doc, innerWidth, value, secondaryValue)
+		doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.statValue)
+		const valueWidth = doc.widthOfString(value)
+		const valueBaseline = fontBaselineOffset(doc)
+		doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.statValueSecondary)
+
+		if (fitsInline) {
+			// Manually positioned (not PDFKit's `continued` text flow) so the smaller
+			// note's BASELINE can be lined up with the value's baseline — matching
+			// "bottom of line box" (via heightOfString/currentLineHeight) isn't the
+			// same thing, since that box includes leading that differs between font
+			// sizes/weights. fontBaselineOffset gives the actual top-of-text-to-
+			// baseline distance for whichever font/size is currently active.
+			const secondaryBaseline = fontBaselineOffset(doc)
+			const secondaryY = valueY + valueBaseline - secondaryBaseline
+			doc
+				.fillColor(COLORS.errorPale)
+				.text(secondaryValue, x + STAT_TILE_PADDING + valueWidth + STAT_TILE_VALUE_SECONDARY_GAP, secondaryY, {
+					width: innerWidth - valueWidth - STAT_TILE_VALUE_SECONDARY_GAP
+				})
+		} else {
+			doc
+				.fillColor(COLORS.errorPale)
+				.text(secondaryValue, x + STAT_TILE_PADDING, valueY + valueHeight, { width: innerWidth })
+		}
+	}
 
 	return y + height
 }

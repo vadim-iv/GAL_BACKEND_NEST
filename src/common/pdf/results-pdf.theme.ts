@@ -13,7 +13,11 @@ export const COLORS = {
 	gray400: '#e6e5e4',
 	gray300: '#f3f4f4',
 	white: '#fffefd',
-	error: '#db3c3c'
+	error: '#db3c3c',
+	// A muted, desaturated tint of `error` — used for secondary/deemphasized notes
+	// (e.g. "(2 deleted members)") that shouldn't compete visually with an actual
+	// error state.
+	errorPale: '#c98a8a'
 } as const
 
 export const FONT_PATHS = {
@@ -50,5 +54,6 @@ export const FONT_SIZE = {
 	small: 9,
 	statValue: 14,
 	statLabel: 8,
+	statValueSecondary: 9.5,
 	footer: 8
 }

@@ -1,5 +1,5 @@
 export declare enum DecisionQuestionType {
     RADIO = "radio",
-    SELECT = "select",
+    CHECKBOX = "checkbox",
     TEXT = "text"
 }

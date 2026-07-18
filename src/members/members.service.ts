@@ -115,10 +115,31 @@ export class MembersService {
 		return this.memberModel.findOne({ email }).exec()
 	}
 
-	async create(dto: MemberDto) {
-		const existingMember = await this.getByEmail(dto.email)
-		if (existingMember) throw new BadRequestException('Member with this email already exists')
+	// Turns an email into a working login account: validates uniqueness, generates
+	// + hashes a password, emails the welcome message. Returns the hashed password
+	// for the caller to persist (create() and update() persist differently, so
+	// persistence itself stays out of this helper).
+	private async provisionAccountForEmail(email: string, excludeMemberId?: string): Promise<string> {
+		const existingMember = await this.getByEmail(email)
+		if (existingMember && existingMember._id.toString() !== excludeMemberId) {
+			throw new BadRequestException('Member with this email already exists')
+		}
 
+		const password = this.generateRandomPassword()
+		const hashedPassword = await hash(password)
+
+		await this.transporter.sendMail({
+			from: `"GAL Admin" <${process.env.SMTP_USERNAME}>`,
+			to: email,
+			subject: 'Bun venit în GAL - Contul tău a fost creat',
+			html: this.createHtmlMessageCreation(email, password),
+			replyTo: process.env.SMTP_USERNAME
+		})
+
+		return hashedPassword
+	}
+
+	async create(dto: MemberDto) {
 		if (dto.roles?.includes(MemberRolesEnum.PRESIDENT)) {
 			const presidentExists = await this.memberModel.exists({ roles: MemberRolesEnum.PRESIDENT })
 			if (presidentExists) {
@@ -126,20 +147,18 @@ export class MembersService {
 			}
 		}
 
-		const password = this.generateRandomPassword()
-		const hashedPassword = await hash(password)
+		const hashedPassword = dto.email ? await this.provisionAccountForEmail(dto.email) : undefined
+
+		// An empty-string email must never be persisted as a literal '' — the
+		// schema's unique index is sparse (allows many documents with the field
+		// entirely absent), but sparse does NOT exempt an explicit '' value, so a
+		// second no-email member would collide on it.
+		const { email, ...memberData } = dto
 
 		const member = await this.memberModel.create({
-			...dto,
-			password: hashedPassword
-		})
-
-		await this.transporter.sendMail({
-			from: `"GAL Admin" <${process.env.SMTP_USERNAME}>`,
-			to: dto.email,
-			subject: 'Bun venit în GAL - Contul tău a fost creat',
-			html: this.createHtmlMessageCreation(dto.email, password),
-			replyTo: process.env.SMTP_USERNAME
+			...memberData,
+			...(email ? { email } : {}),
+			...(hashedPassword ? { password: hashedPassword } : {})
 		})
 
 		await this.syncManagement()
@@ -149,7 +168,9 @@ export class MembersService {
 
 	async update(id: string, dto: UpdateMemberDto) {
 		if (!dto || Object.keys(dto).length === 0) throw new BadRequestException('No data provided')
-		let data = dto
+
+		const existingMember = await this.memberModel.findById(id)
+		if (!existingMember) throw new NotFoundException('Member not found')
 
 		if (dto.roles?.includes(MemberRolesEnum.PRESIDENT)) {
 			const presidentExists = await this.memberModel.exists({
@@ -159,6 +180,19 @@ export class MembersService {
 			if (presidentExists) {
 				throw new BadRequestException('A president already exists — remove or reassign them first')
 			}
+		}
+
+		const data: Partial<Member> = { ...dto }
+
+		if (!existingMember.email && dto.email) {
+			// Retroactive account creation: member had no login, admin just gave them one.
+			data.password = await this.provisionAccountForEmail(dto.email, id)
+		} else {
+			// Member already has an email (locked in the UI) — drop it defensively so
+			// this endpoint can never silently overwrite an existing account's login
+			// email, even if some future/rogue client bypasses the frontend's
+			// disabled state.
+			delete data.email
 		}
 
 		const member = await this.memberModel.findByIdAndUpdate(id, data, { new: true })
@@ -237,7 +271,10 @@ export class MembersService {
 		const member = await this.memberModel
 			.findOne({ resetPasswordTokenHash: tokenHash, resetPasswordTokenExpires: { $gt: new Date() } })
 			.exec()
-		if (!member) throw new BadRequestException('This reset link is invalid or has expired')
+		// A reset token can only ever have been issued to a member found via
+		// getByEmail() in forgotPassword(), so email is guaranteed present here —
+		// this check is just making that invariant explicit for the type checker.
+		if (!member || !member.email) throw new BadRequestException('This reset link is invalid or has expired')
 
 		const newPassword = this.generateRandomPassword()
 		const hashedPassword = await hash(newPassword)

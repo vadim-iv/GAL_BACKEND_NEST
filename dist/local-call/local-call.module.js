@@ -13,12 +13,19 @@ const local_call_controller_1 = require("./local-call.controller");
 const aws_module_1 = require("../aws/aws.module");
 const mongoose_1 = require("@nestjs/mongoose");
 const local_call_schema_1 = require("../schemas/local_call.schema");
+const member_schema_1 = require("../schemas/member.schema");
 let LocalCallModule = class LocalCallModule {
 };
 exports.LocalCallModule = LocalCallModule;
 exports.LocalCallModule = LocalCallModule = __decorate([
     (0, common_1.Module)({
-        imports: [aws_module_1.AwsModule, mongoose_1.MongooseModule.forFeature([{ name: local_call_schema_1.LocalCall.name, schema: local_call_schema_1.LocalCallSchema }])],
+        imports: [
+            aws_module_1.AwsModule,
+            mongoose_1.MongooseModule.forFeature([
+                { name: local_call_schema_1.LocalCall.name, schema: local_call_schema_1.LocalCallSchema },
+                { name: member_schema_1.Member.name, schema: member_schema_1.MemberSchema }
+            ])
+        ],
         controllers: [local_call_controller_1.LocalCallController],
         providers: [local_call_service_1.LocalCallService]
     })

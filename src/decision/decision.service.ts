@@ -136,7 +136,7 @@ export class DecisionService {
 			}
 		}
 
-		for (const { questionId, value, memberId } of answers) {
+		for (const { questionId, value, values, memberId } of answers) {
 			const question = decision.questions.find((q) => q._id.toString() === questionId)
 
 			if (!question) {
@@ -149,13 +149,22 @@ export class DecisionService {
 				throw new BadRequestException(`Member already answered question ${questionId}`)
 			}
 
-			if (
-				question.type === DecisionQuestionType.RADIO ||
-				question.type === DecisionQuestionType.SELECT
-			) {
+			if (question.type === DecisionQuestionType.RADIO) {
 				const optionExists = question.options?.some((opt) => opt.value === value)
 
 				if (!optionExists) {
+					throw new BadRequestException(`Invalid option for question ${questionId}`)
+				}
+			}
+
+			if (question.type === DecisionQuestionType.CHECKBOX) {
+				if (!values || values.length === 0) {
+					throw new BadRequestException(`At least one option is required for question ${questionId}`)
+				}
+
+				const allOptionsExist = values.every((v) => question.options?.some((opt) => opt.value === v))
+
+				if (!allOptionsExist) {
 					throw new BadRequestException(`Invalid option for question ${questionId}`)
 				}
 			}
@@ -170,7 +179,7 @@ export class DecisionService {
 
 			question.answers.push({
 				memberId: new Types.ObjectId(memberId),
-				value
+				...(question.type === DecisionQuestionType.CHECKBOX ? { values } : { value })
 			})
 		}
 
@@ -202,7 +211,7 @@ export class DecisionService {
 	private validateQuestions(questions: DecisionQuestionDto[]) {
 		for (const question of questions) {
 			if (
-				question.type === DecisionQuestionType.SELECT ||
+				question.type === DecisionQuestionType.CHECKBOX ||
 				question.type === DecisionQuestionType.RADIO
 			) {
 				if (!question.options || question.options.length === 0) {

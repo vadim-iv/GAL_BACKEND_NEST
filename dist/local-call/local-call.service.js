@@ -21,26 +21,40 @@ const sorting_enum_1 = require("../enums/sorting.enum");
 const status_enum_1 = require("../enums/status.enum");
 const aws_service_1 = require("../aws/aws.service");
 const results_pdf_builder_1 = require("../common/pdf/results-pdf.builder");
+const member_schema_1 = require("../schemas/member.schema");
 let LocalCallService = class LocalCallService {
     localCallModel;
+    memberModel;
     awsService;
-    constructor(localCallModel, awsService) {
+    constructor(localCallModel, memberModel, awsService) {
         this.localCallModel = localCallModel;
+        this.memberModel = memberModel;
         this.awsService = awsService;
     }
     async getAll(dto) {
-        const { page, limit, sort, sortDirection = sorting_enum_1.SortDirection.DESC } = dto;
+        const { page = 1, limit = 12, sort, sortDirection = sorting_enum_1.SortDirection.DESC } = dto;
+        const skip = (page - 1) * limit;
         let query = this.localCallModel.find().populate('projects.answers.memberId', '_id name email');
         if (sort) {
             const sortOrder = sortDirection === sorting_enum_1.SortDirection.ASC ? 1 : -1;
             query = query.sort({ [sort]: sortOrder });
         }
-        if (page && limit) {
-            const skip = (page - 1) * limit;
-            query = query.skip(skip).limit(limit);
-        }
-        const localCalls = await query.exec();
-        return localCalls.map((localCall) => this.toResponseObject(localCall));
+        query = query.skip(skip).limit(limit);
+        const [localCalls, total] = await Promise.all([
+            query.exec(),
+            this.localCallModel.countDocuments().exec()
+        ]);
+        return {
+            localCalls: localCalls.map((localCall) => this.toResponseObject(localCall)),
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit),
+                hasPrevPage: page > 1
+            }
+        };
     }
     async getById(id) {
         const localCall = await this.localCallModel
@@ -49,6 +63,40 @@ let LocalCallService = class LocalCallService {
         if (!localCall)
             throw new common_1.NotFoundException('Local call not found');
         return this.toResponseObject(localCall);
+    }
+    async getProjects(localCallId, dto) {
+        const { page = 1, limit = 12 } = dto;
+        const skip = (page - 1) * limit;
+        const [result] = await this.localCallModel
+            .aggregate([
+            { $match: { _id: new mongoose_2.Types.ObjectId(localCallId) } },
+            {
+                $project: {
+                    questions: 1,
+                    total: { $size: '$projects' },
+                    projects: { $slice: [{ $reverseArray: '$projects' }, skip, limit] }
+                }
+            }
+        ])
+            .exec();
+        if (!result)
+            throw new common_1.NotFoundException('Local call not found');
+        const total = result.total;
+        const projects = result.projects.map((project) => ({
+            ...project,
+            averageMark: this.calculateAverageMark(result.questions, project)
+        }));
+        return {
+            projects,
+            pagination: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                hasNextPage: page < Math.ceil(total / limit),
+                hasPrevPage: page > 1
+            }
+        };
     }
     async create(dto) {
         const questions = dto.questions.map((q) => ({ ...q, maxScore: q.maxScore ?? 10 }));
@@ -109,17 +157,6 @@ let LocalCallService = class LocalCallService {
         await localCall.save();
         return localCall.toObject();
     }
-    async updateProjectStatus(localCallId, projectId, status) {
-        const localCall = await this.localCallModel.findById(localCallId);
-        if (!localCall)
-            throw new common_1.NotFoundException('Local call not found');
-        const project = localCall.projects.find((p) => p._id.toString() === projectId);
-        if (!project)
-            throw new common_1.NotFoundException('Project not found');
-        project.status = status;
-        await localCall.save();
-        return localCall.toObject();
-    }
     async addAnswers(dto) {
         const { localCallId, projectId, answers } = dto;
         const localCall = await this.localCallModel.findById(localCallId);
@@ -142,6 +179,14 @@ let LocalCallService = class LocalCallService {
         const allAnswered = questionIds.every((id) => answeredIds.includes(id));
         if (!allAnswered) {
             throw new common_1.BadRequestException('You must answer all questions to submit.');
+        }
+        const memberIds = [...new Set(answers.map((a) => a.memberId))];
+        const existingMembers = await this.memberModel.find({ _id: { $in: memberIds } }).select('_id').exec();
+        const existingMemberIds = new Set(existingMembers.map((m) => m._id.toString()));
+        for (const memberId of memberIds) {
+            if (!existingMemberIds.has(memberId)) {
+                throw new common_1.NotFoundException(`Member ${memberId} not found`);
+            }
         }
         for (const { questionId, answer, memberId } of answers) {
             const question = localCall.questions.find((q) => q._id.toString() === questionId);
@@ -172,13 +217,16 @@ let LocalCallService = class LocalCallService {
     async deleteDocuments(fileUrls) {
         return this.awsService.deleteImages(fileUrls);
     }
-    async generateResultsPdf(id, lang = 'ro') {
+    async generateProjectResultsPdf(id, projectId, lang = 'ro') {
         const localCall = await this.localCallModel
             .findById(id)
             .populate('projects.answers.memberId', '_id name email');
         if (!localCall)
             throw new common_1.NotFoundException('Local call not found');
-        return (0, results_pdf_builder_1.buildLocalCallResultsPdf)(localCall, lang);
+        const project = localCall.projects.find((p) => p._id.toString() === projectId);
+        if (!project)
+            throw new common_1.NotFoundException('Project not found');
+        return (0, results_pdf_builder_1.buildProjectResultsPdf)(localCall, project, lang);
     }
     toResponseObject(localCall) {
         const obj = localCall.toObject();
@@ -204,7 +252,9 @@ exports.LocalCallService = LocalCallService;
 exports.LocalCallService = LocalCallService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(local_call_schema_1.LocalCall.name)),
+    __param(1, (0, mongoose_1.InjectModel)(member_schema_1.Member.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model,
         aws_service_1.AwsService])
 ], LocalCallService);
 //# sourceMappingURL=local-call.service.js.map

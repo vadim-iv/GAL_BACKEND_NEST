@@ -4,24 +4,35 @@ import { GetDecisionsDto } from './dto/get-decisions.dto';
 import { DecisionDto } from './dto/decision.dto';
 import { UpdateDecisionDto } from './dto/update-decision-dto';
 import { AddDecisionAnswersDto } from './dto/add-answers.dto';
-import { ApprovalStatusEnum } from 'src/enums/status.enum';
 import { AwsService } from 'src/aws/aws.service';
 import { ResultsPdfLang } from 'src/common/pdf/results-pdf.builder';
+import { TMember } from 'src/schemas/member.schema';
 export declare class DecisionService {
     private decisionModel;
+    private memberModel;
     private readonly awsService;
-    constructor(decisionModel: Model<DecisionDocument>, awsService: AwsService);
-    getAll(dto: GetDecisionsDto): Promise<(import("mongoose").Document<unknown, {}, import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
-        _id: Types.ObjectId;
-    } & {
-        __v: number;
-    }, {}> & import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
-        _id: Types.ObjectId;
-    } & {
-        __v: number;
-    } & Required<{
-        _id: Types.ObjectId;
-    }>)[]>;
+    constructor(decisionModel: Model<DecisionDocument>, memberModel: Model<TMember>, awsService: AwsService);
+    getAll(dto: GetDecisionsDto): Promise<{
+        decisions: (import("mongoose").Document<unknown, {}, import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
+            _id: Types.ObjectId;
+        } & {
+            __v: number;
+        }, {}> & import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
+            _id: Types.ObjectId;
+        } & {
+            __v: number;
+        } & Required<{
+            _id: Types.ObjectId;
+        }>)[];
+        pagination: {
+            page: number;
+            limit: number;
+            total: number;
+            totalPages: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    }>;
     getById(id: string): Promise<import("mongoose").Document<unknown, {}, import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
         _id: Types.ObjectId;
     } & {
@@ -63,17 +74,6 @@ export declare class DecisionService {
         _id: Types.ObjectId;
     }>>;
     addAnswers(dto: AddDecisionAnswersDto): Promise<import("mongoose").Document<unknown, {}, import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
-        _id: Types.ObjectId;
-    } & {
-        __v: number;
-    }, {}> & import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
-        _id: Types.ObjectId;
-    } & {
-        __v: number;
-    } & Required<{
-        _id: Types.ObjectId;
-    }>>;
-    updateStatus(id: string, status: ApprovalStatusEnum): Promise<import("mongoose").Document<unknown, {}, import("mongoose").Document<unknown, {}, Decision, {}> & Decision & {
         _id: Types.ObjectId;
     } & {
         __v: number;

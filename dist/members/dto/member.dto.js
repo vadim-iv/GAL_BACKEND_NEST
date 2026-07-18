@@ -18,11 +18,13 @@ class MemberDto {
     email;
     name;
     details;
+    shortDetails;
     imageUrl;
-    role;
+    roles;
 }
 exports.MemberDto = MemberDto;
 __decorate([
+    (0, class_validator_1.ValidateIf)((o) => !!o.email),
     (0, class_validator_1.IsEmail)(),
     __metadata("design:type", String)
 ], MemberDto.prototype, "email", void 0);
@@ -33,18 +35,28 @@ __decorate([
     __metadata("design:type", multiLangText_dto_1.MultiLangTextDto)
 ], MemberDto.prototype, "name", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((o) => Array.isArray(o.roles) && o.roles.includes(member_enum_1.MemberRolesEnum.PRESIDENT)),
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.ValidateNested)(),
     (0, class_transformer_1.Type)(() => multiLangText_dto_1.MultiLangTextDto),
     __metadata("design:type", multiLangText_dto_1.MultiLangTextDto)
 ], MemberDto.prototype, "details", void 0);
 __decorate([
+    (0, class_validator_1.IsObject)(),
+    (0, class_validator_1.ValidateNested)(),
+    (0, class_transformer_1.Type)(() => multiLangText_dto_1.MultiLangTextDto),
+    __metadata("design:type", multiLangText_dto_1.MultiLangTextDto)
+], MemberDto.prototype, "shortDetails", void 0);
+__decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], MemberDto.prototype, "imageUrl", void 0);
 __decorate([
-    (0, class_validator_1.IsEnum)(member_enum_1.MemberRolesEnum),
-    __metadata("design:type", String)
-], MemberDto.prototype, "role", void 0);
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ArrayMinSize)(1),
+    (0, class_validator_1.IsEnum)(member_enum_1.MemberRolesEnum, { each: true }),
+    __metadata("design:type", Array)
+], MemberDto.prototype, "roles", void 0);
 //# sourceMappingURL=member.dto.js.map

@@ -34,11 +34,38 @@ export { ResultsPdfLang } from './results-pdf.i18n'
 // full Member subdocument rather than a raw ObjectId — this reads the id correctly
 // either way, since only the distinct-voter count is ever needed here, never the
 // member's name/email (that per-member display is exactly what's being removed).
-function getMemberIdString(memberId: Types.ObjectId | { _id: Types.ObjectId }): string {
-	if (memberId && typeof memberId === 'object' && '_id' in memberId) {
+// null when the member who cast that vote was later deleted — the populated
+// reference has nothing left to resolve to, so there's no id to return.
+function getMemberIdString(memberId: Types.ObjectId | { _id: Types.ObjectId } | null): string | null {
+	if (!memberId) return null
+	if (typeof memberId === 'object' && '_id' in memberId) {
 		return memberId._id.toString()
 	}
 	return (memberId as Types.ObjectId).toString()
+}
+
+// A deleted member's votes stay on the decision/project forever (their answer
+// subdocuments are never removed) — only the populated memberId resolves to null,
+// since there's nothing left to point to. That means a deleted member's identity
+// can't be deduped the way a real member's can: every null looks identical,
+// whether it's the same person's answer to several questions or several different
+// deleted people. The best available proxy for "how many distinct people were
+// deleted" is the HIGHEST per-question count of null-memberId answers — every
+// deleted member contributes exactly one such answer to every question they
+// originally answered (submissions cover every question at once), so the
+// question with the most null answers had at least that many distinct deleted
+// voters.
+function countDeletedVoters(perQuestionAnswers: { memberId: unknown }[][]): number {
+	return Math.max(0, ...perQuestionAnswers.map((answers) => answers.filter((a) => !a.memberId).length))
+}
+
+// Drawn inline right after the main voter count (see drawStatTile's
+// secondaryValue), styled smaller and in a muted color so it still reads as a
+// deemphasized aside rather than part of the headline number.
+function getDeletedVotersNote(deletedVoters: number, lang: ResultsPdfLang): string | undefined {
+	if (deletedVoters === 0) return undefined
+	const word = tr(lang, deletedVoters === 1 ? 'deletedMemberSingular' : 'deletedMemberPlural')
+	return `(${tr(lang, 'and')} ${deletedVoters} ${word})`
 }
 
 // Blends each project's answers into a single 0-10 mark, normalizing per-question
@@ -85,7 +112,7 @@ function stripHtml(html: string): string {
 		.trim()
 }
 
-function renderToBuffer(lang: ResultsPdfLang, titleText: string, render: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
+function renderToBuffer(lang: ResultsPdfLang, render: (doc: PDFKit.PDFDocument) => void): Promise<Buffer> {
 	return new Promise((resolve, reject) => {
 		const doc = createDocument()
 		registerFonts(doc)
@@ -98,8 +125,8 @@ function renderToBuffer(lang: ResultsPdfLang, titleText: string, render: (doc: P
 		// Page 1 is created inside `createDocument()`, before this listener exists,
 		// so it needs one explicit draw; every later page (explicit ensureSpace()
 		// breaks or pdfkit's own overflow inside a long chart/list) fires the event.
-		doc.on('pageAdded', () => drawHeader(doc, titleText))
-		drawHeader(doc, titleText)
+		doc.on('pageAdded', () => drawHeader(doc))
+		drawHeader(doc)
 
 		render(doc)
 
@@ -128,7 +155,7 @@ export async function buildDecisionResultsPdf(
 ): Promise<Buffer> {
 	const title = t(decision.title as MultiLangTextLike, lang)
 
-	return renderToBuffer(lang, title, (doc) => {
+	return renderToBuffer(lang, (doc) => {
 		const x = PAGE.margins.left
 		const width = contentWidth(doc)
 
@@ -141,8 +168,12 @@ export async function buildDecisionResultsPdf(
 		}
 
 		const totalVoters = new Set(
-			decision.questions.flatMap((q) => (q.answers || []).map((a) => getMemberIdString(a.memberId)))
+			decision.questions
+				.flatMap((q) => (q.answers || []).map((a) => getMemberIdString(a.memberId)))
+				.filter((id): id is string => id !== null)
 		).size
+		const deletedVoters = countDeletedVoters(decision.questions.map((q) => q.answers || []))
+		const deletedVotersNote = getDeletedVotersNote(deletedVoters, lang)
 
 		const statTop = doc.y
 		const statGap = 16
@@ -155,7 +186,7 @@ export async function buildDecisionResultsPdf(
 		const rowHeight = Math.max(
 			STATUS_PILL_HEIGHT,
 			measureStatTileHeight(doc, tileWidth, voteWindowLabel, voteWindowText),
-			measureStatTileHeight(doc, tileWidth, totalVotersLabel, String(totalVoters))
+			measureStatTileHeight(doc, tileWidth, totalVotersLabel, String(totalVoters), deletedVotersNote)
 		)
 
 		const pill = drawDecisionStatusPill(doc, x, statTop + (rowHeight - STATUS_PILL_HEIGHT) / 2, decision.status, lang)
@@ -166,7 +197,8 @@ export async function buildDecisionResultsPdf(
 			statTop,
 			tileWidth,
 			totalVotersLabel,
-			String(totalVoters)
+			String(totalVoters),
+			deletedVotersNote
 		)
 
 		doc.y = Math.max(pill.bottom, tile1Bottom, tile2Bottom) + 24
@@ -191,7 +223,7 @@ function renderDecisionQuestion(
 	doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.sectionLabel)
 	const labelHeight = doc.heightOfString(questionLabel, { width: innerWidth })
 
-	const isChoice = question.type === DecisionQuestionType.RADIO || question.type === DecisionQuestionType.SELECT
+	const isChoice = question.type === DecisionQuestionType.RADIO || question.type === DecisionQuestionType.CHECKBOX
 	const answers = question.answers || []
 
 	let options: BarChartOption[] = []
@@ -201,14 +233,24 @@ function renderDecisionQuestion(
 	if (isChoice) {
 		const tally = new Map<string, number>()
 		for (const option of question.options || []) tally.set(option.value, 0)
-		for (const answer of answers) tally.set(answer.value, (tally.get(answer.value) || 0) + 1)
+		// CHECKBOX answers carry `values` (a respondent can count toward several
+		// options at once) — RADIO answers carry a single `value`. `answers.length`
+		// stays a valid "number of respondents" denominator either way, since one
+		// answer doc is still pushed per member per question.
+		for (const answer of answers) {
+			const selected = question.type === DecisionQuestionType.CHECKBOX ? answer.values || [] : [answer.value]
+			for (const value of selected) {
+				if (!value) continue
+				tally.set(value, (tally.get(value) || 0) + 1)
+			}
+		}
 		options = (question.options || []).map((o) => ({
 			label: t(o.label as MultiLangTextLike, lang),
 			count: tally.get(o.value) || 0
 		}))
 		bodyHeight = estimateHorizontalBarChartHeight(doc, innerWidth, options, answers.length)
 	} else {
-		textAnswers = answers.map((a) => a.value)
+		textAnswers = answers.map((a) => a.value || '')
 		doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.small)
 		bodyHeight =
 			textAnswers.length === 0
@@ -254,13 +296,28 @@ export async function buildProjectResultsPdf(
 	const title = t(project.title as MultiLangTextLike, lang)
 	const subtitle = t(localCall.name as MultiLangTextLike, lang)
 
-	return renderToBuffer(lang, `${subtitle} — ${title}`, (doc) => {
+	return renderToBuffer(lang, (doc) => {
 		const x = PAGE.margins.left
 		const width = contentWidth(doc)
 
 		drawTitleBlock(doc, x, width, title, subtitle)
 
-		const totalVoters = new Set((project.answers || []).map((a) => getMemberIdString(a.memberId))).size
+		const totalVoters = new Set(
+			(project.answers || [])
+				.map((a) => getMemberIdString(a.memberId))
+				.filter((id): id is string => id !== null)
+		).size
+		// project.answers is flat (one entry per question per member, not nested per
+		// question like a decision's) — group by questionId first so
+		// countDeletedVoters can compare "answers to the same question" against each
+		// other, same as it does for decisions.
+		const answersByQuestion = new Map<string, { memberId: unknown }[]>()
+		for (const answer of project.answers || []) {
+			const key = answer.questionId.toString()
+			answersByQuestion.set(key, [...(answersByQuestion.get(key) || []), answer])
+		}
+		const deletedVoters = countDeletedVoters([...answersByQuestion.values()])
+		const deletedVotersNote = getDeletedVotersNote(deletedVoters, lang)
 		const averageMark = calculateAverageMark(localCall.questions, project.answers)
 
 		const statTop = doc.y
@@ -274,7 +331,7 @@ export async function buildProjectResultsPdf(
 		const rowHeight = Math.max(
 			STATUS_PILL_HEIGHT,
 			measureStatTileHeight(doc, tileWidth, averageScoreLabel, averageScoreValue),
-			measureStatTileHeight(doc, tileWidth, totalVotersLabel, String(totalVoters))
+			measureStatTileHeight(doc, tileWidth, totalVotersLabel, String(totalVoters), deletedVotersNote)
 		)
 
 		const pill = drawStatusPill(doc, x, statTop + (rowHeight - STATUS_PILL_HEIGHT) / 2, project.status, lang)
@@ -292,7 +349,8 @@ export async function buildProjectResultsPdf(
 			statTop,
 			tileWidth,
 			totalVotersLabel,
-			String(totalVoters)
+			String(totalVoters),
+			deletedVotersNote
 		)
 
 		doc.y = Math.max(pill.bottom, tile1Bottom, tile2Bottom) + 24

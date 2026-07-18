@@ -15,6 +15,7 @@ const class_validator_1 = require("class-validator");
 class SingleDecisionAnswerDto {
     questionId;
     value;
+    values;
     memberId;
 }
 __decorate([
@@ -22,10 +23,16 @@ __decorate([
     __metadata("design:type", String)
 ], SingleDecisionAnswerDto.prototype, "questionId", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], SingleDecisionAnswerDto.prototype, "value", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], SingleDecisionAnswerDto.prototype, "values", void 0);
 __decorate([
     (0, class_validator_1.IsMongoId)(),
     __metadata("design:type", String)

@@ -4,7 +4,7 @@ exports.DecisionQuestionType = void 0;
 var DecisionQuestionType;
 (function (DecisionQuestionType) {
     DecisionQuestionType["RADIO"] = "radio";
-    DecisionQuestionType["SELECT"] = "select";
+    DecisionQuestionType["CHECKBOX"] = "checkbox";
     DecisionQuestionType["TEXT"] = "text";
 })(DecisionQuestionType || (exports.DecisionQuestionType = DecisionQuestionType = {}));
 //# sourceMappingURL=decision.enum.js.map

@@ -14,6 +14,7 @@ const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const multiLangText_dto_1 = require("../../blogs/dto/multiLangText.dto");
 const decision_enum_1 = require("../../enums/decision.enum");
+const decision_status_enum_1 = require("../../enums/decision-status.enum");
 class DecisionOptionDto {
     value;
     label;
@@ -32,6 +33,7 @@ __decorate([
 class DecisionAnswerDto {
     memberId;
     value;
+    values;
 }
 exports.DecisionAnswerDto = DecisionAnswerDto;
 __decorate([
@@ -39,16 +41,29 @@ __decorate([
     __metadata("design:type", String)
 ], DecisionAnswerDto.prototype, "memberId", void 0);
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], DecisionAnswerDto.prototype, "value", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    __metadata("design:type", Array)
+], DecisionAnswerDto.prototype, "values", void 0);
 class DecisionQuestionDto {
+    _id;
     question;
     type;
     options;
     answers;
 }
 exports.DecisionQuestionDto = DecisionQuestionDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsMongoId)(),
+    __metadata("design:type", String)
+], DecisionQuestionDto.prototype, "_id", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.ValidateNested)(),
@@ -77,6 +92,7 @@ class DecisionDto {
     title;
     description;
     imageUrl;
+    status;
     questions;
     voteStart;
     voteEnd;
@@ -99,6 +115,11 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], DecisionDto.prototype, "imageUrl", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(decision_status_enum_1.DecisionStatusEnum),
+    __metadata("design:type", String)
+], DecisionDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsArray)(),
     (0, class_validator_1.ArrayMinSize)(1),

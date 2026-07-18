@@ -7,11 +7,17 @@ export type TMember = HydratedDocument<Member>
 
 @Schema()
 export class Member {
-	@Prop({ type: String, required: true, unique: true })
-	email: string
+	// Optional: a member with no email is a public-profile-only entry with no
+	// voting-platform account. `sparse` is required alongside `unique` — a plain
+	// unique index treats every document missing the field as colliding on the
+	// same implicit null key, so a second email-less member would otherwise hit
+	// a duplicate-key error.
+	@Prop({ type: String, required: false, unique: true, sparse: true })
+	email?: string
 
-	@Prop({ type: String, required: true })
-	password: string
+	// Only set when `email` is present (account exists).
+	@Prop({ type: String, required: false })
+	password?: string
 
     @Prop({ type: MultiLangText, required: true })
     name: MultiLangText

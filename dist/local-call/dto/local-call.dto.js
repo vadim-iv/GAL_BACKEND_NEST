@@ -14,10 +14,16 @@ const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 const multiLangText_dto_1 = require("../../blogs/dto/multiLangText.dto");
 class LocalCallQuestionDto {
+    _id;
     question;
     maxScore;
 }
 exports.LocalCallQuestionDto = LocalCallQuestionDto;
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsMongoId)(),
+    __metadata("design:type", String)
+], LocalCallQuestionDto.prototype, "_id", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
     (0, class_validator_1.ValidateNested)(),

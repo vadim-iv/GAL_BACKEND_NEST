@@ -42,14 +42,13 @@ let ManagementService = class ManagementService {
     }
     async syncFromMembers() {
         const members = await this.memberModel.find().exec();
-        const byRole = (role) => members.filter((m) => m.role === role).sort((a, b) => a.name.ro.localeCompare(b.name.ro));
-        const allMembersSorted = [...members].sort((a, b) => a.name.ro.localeCompare(b.name.ro));
+        const byRole = (role) => members.filter((m) => m.roles.includes(role)).sort((a, b) => a.name.ro.localeCompare(b.name.ro));
         const president = this.buildPresident(byRole(member_enum_1.MemberRolesEnum.PRESIDENT)[0]);
         const executive = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.EXECUTIVE_BODY));
         const administration = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.ADMINISTRATION));
         const committee = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.SELECTION_COMMITTEE));
         const censorship = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.CENSORSHIP_COMMITTEE));
-        const general_assembly = this.buildColumns(allMembersSorted);
+        const general_assembly = this.buildColumns(byRole(member_enum_1.MemberRolesEnum.GENERAL_ASSEMBLY));
         await this.managementModel
             .findOneAndUpdate({}, { $set: { president, executive, administration, committee, censorship, general_assembly } }, { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true })
             .exec();
@@ -102,22 +101,41 @@ let ManagementService = class ManagementService {
         ];
         return this.managementModel.aggregate(pipeline).exec();
     }
-    formatMemberLine(member, lang) {
-        return `<p><strong>${member.name[lang]}</strong>, ${member.details[lang]}</p>`;
+    toPlainText(html) {
+        return html
+            .replace(/<\/(p|h[1-6]|li|div|br)>/gi, ' ')
+            .replace(/<[^>]+>/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+    formatPresidentDetail(member, lang) {
+        const details = member.details?.[lang] || '';
+        const emailLine = member.email ? `<p>${member.email}</p>` : '';
+        return `<p><strong>${member.name[lang].toUpperCase()}</strong></p>${emailLine}${details}`;
+    }
+    formatShortDetail(member, lang) {
+        const details = this.toPlainText(member.shortDetails[lang]);
+        const emailSegment = member.email ? `, ${member.email}` : '';
+        return `<p><strong>${member.name[lang]}</strong>${emailSegment}, ${details}</p>`;
     }
     buildPresident(member) {
         if (!member) {
             return { text: this.emptyMultiLangText(), image: '' };
         }
-        const text = this.buildMultiLangText((lang) => this.formatMemberLine(member, lang));
+        const text = this.buildMultiLangText((lang) => this.formatPresidentDetail(member, lang));
         return { text, image: member.imageUrl || '' };
     }
     buildColumns(members) {
+        if (members.length === 0) {
+            return { column1: this.emptyMultiLangText(), column2: this.emptyMultiLangText() };
+        }
         const mid = Math.ceil(members.length / 2);
         const firstHalf = members.slice(0, mid);
         const secondHalf = members.slice(mid);
-        const column1 = this.buildMultiLangText((lang) => firstHalf.map((m) => this.formatMemberLine(m, lang)).join(''));
-        const column2 = this.buildMultiLangText((lang) => secondHalf.map((m) => this.formatMemberLine(m, lang)).join(''));
+        const column1 = this.buildMultiLangText((lang) => `<ol>${firstHalf.map((m) => `<li>${this.formatShortDetail(m, lang)}</li>`).join('')}</ol>`);
+        const column2 = secondHalf.length > 0
+            ? this.buildMultiLangText((lang) => `<ol start="${firstHalf.length + 1}">${secondHalf.map((m) => `<li>${this.formatShortDetail(m, lang)}</li>`).join('')}</ol>`)
+            : this.emptyMultiLangText();
         return { column1, column2 };
     }
     buildMultiLangText(build) {

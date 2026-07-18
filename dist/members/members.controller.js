@@ -19,6 +19,9 @@ const auth_decorator_1 = require("../auth/decorators/auth.decorator");
 const member_dto_1 = require("./dto/member.dto");
 const update_member_dto_1 = require("./dto/update-member.dto");
 const member_auth_decorator_1 = require("../auth/decorators/member-auth.decorator");
+const delete_images_dto_1 = require("../blogs/dto/delete-images.dto");
+const forgot_password_dto_1 = require("./dto/forgot-password.dto");
+const confirm_password_reset_dto_1 = require("./dto/confirm-password-reset.dto");
 let MembersController = class MembersController {
     membersService;
     constructor(membersService) {
@@ -42,8 +45,20 @@ let MembersController = class MembersController {
     async delete(id) {
         return this.membersService.delete(id);
     }
+    async generateImageUploadLink() {
+        return this.membersService.generateImageUploadLink();
+    }
+    async deleteFiles(dto) {
+        return this.membersService.deleteMemberImages(dto.imageUrls);
+    }
     async resetPassword(email) {
         return this.membersService.resetPassword(email);
+    }
+    async forgotPassword(dto) {
+        return this.membersService.forgotPassword(dto.email);
+    }
+    async confirmPasswordReset(dto) {
+        return this.membersService.confirmPasswordReset(dto.token);
     }
 };
 exports.MembersController = MembersController;
@@ -104,6 +119,24 @@ __decorate([
 ], MembersController.prototype, "delete", null);
 __decorate([
     (0, common_1.HttpCode)(200),
+    (0, common_1.Post)('generate-upload-link'),
+    (0, auth_decorator_1.Auth)(),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], MembersController.prototype, "generateImageUploadLink", null);
+__decorate([
+    (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true })),
+    (0, common_1.HttpCode)(200),
+    (0, common_1.Post)('delete-files'),
+    (0, auth_decorator_1.Auth)(),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [delete_images_dto_1.DeleteImagesDto]),
+    __metadata("design:returntype", Promise)
+], MembersController.prototype, "deleteFiles", null);
+__decorate([
+    (0, common_1.HttpCode)(200),
     (0, common_1.Post)('reset-password'),
     (0, member_auth_decorator_1.MemberAuth)(),
     __param(0, (0, common_1.Body)('email')),
@@ -111,6 +144,24 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], MembersController.prototype, "resetPassword", null);
+__decorate([
+    (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true })),
+    (0, common_1.HttpCode)(200),
+    (0, common_1.Post)('forgot-password'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [forgot_password_dto_1.ForgotPasswordDto]),
+    __metadata("design:returntype", Promise)
+], MembersController.prototype, "forgotPassword", null);
+__decorate([
+    (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true })),
+    (0, common_1.HttpCode)(200),
+    (0, common_1.Post)('confirm-password-reset'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [confirm_password_reset_dto_1.ConfirmPasswordResetDto]),
+    __metadata("design:returntype", Promise)
+], MembersController.prototype, "confirmPasswordReset", null);
 exports.MembersController = MembersController = __decorate([
     (0, common_1.Controller)('members'),
     __metadata("design:paramtypes", [members_service_1.MembersService])

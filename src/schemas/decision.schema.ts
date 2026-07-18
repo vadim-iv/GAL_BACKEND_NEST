@@ -23,8 +23,13 @@ export class DecisionAnswer {
   @Prop({ type: Types.ObjectId, ref: Member.name, required: true })
   memberId: Types.ObjectId
 
-  @Prop({ type: String, required: true })
-  value: string
+  // Single selected value — used by RADIO/TEXT answers.
+  @Prop({ type: String, required: false })
+  value?: string
+
+  // Selected option values — used by CHECKBOX (multi-select) answers instead of `value`.
+  @Prop({ type: [String], required: false })
+  values?: string[]
 }
 
 @Schema()

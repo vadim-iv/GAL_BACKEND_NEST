@@ -1,5 +1,6 @@
 import { MultiLangTextDto } from 'src/blogs/dto/multiLangText.dto';
 export declare class LocalCallQuestionDto {
+    _id?: string;
     question: MultiLangTextDto;
     maxScore?: number;
 }

@@ -20,14 +20,20 @@ const mongoose_2 = require("mongoose");
 const member_schema_1 = require("../schemas/member.schema");
 const argon2_1 = require("argon2");
 const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 const management_service_1 = require("../management/management.service");
+const aws_service_1 = require("../aws/aws.service");
+const member_enum_1 = require("../enums/member.enum");
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 let MembersService = MembersService_1 = class MembersService {
     memberModel;
     managementService;
+    awsService;
     logger = new common_1.Logger(MembersService_1.name);
-    constructor(memberModel, managementService) {
+    constructor(memberModel, managementService, awsService) {
         this.memberModel = memberModel;
         this.managementService = managementService;
+        this.awsService = awsService;
     }
     async syncManagement() {
         try {
@@ -87,6 +93,23 @@ let MembersService = MembersService_1 = class MembersService {
         </div>
     `;
     }
+    createHtmlMessageResetLink(resetUrl) {
+        return `
+        <div style="font-family: Arial, sans-serif; background: #F6F6F6; padding: 32px;">
+            <div style="max-width: 600px; margin: auto; background: #FFFEFD; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); padding: 24px;">
+                <h2 style="color: #11200B; margin-top: 0;">Resetare parolă - GAL</h2>
+                <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 16px 0;">
+                <p style="color: #11200B;">Am primit o cerere de resetare a parolei contului tău. Apasă pe butonul de mai jos pentru a continua:</p>
+                <p style="text-align: center; margin: 24px 0;">
+                    <a href="${resetUrl}" style="background: #4C8332; color: #FFFEFD; padding: 12px 24px; border-radius: 24px; text-decoration: none; font-weight: bold; display: inline-block;">Resetează parola</a>
+                </p>
+                <p style="color: #888; font-size: 0.9em;">Acest link este valabil timp de o oră. Dacă nu ai solicitat resetarea parolei, poți ignora acest mesaj.</p>
+                <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 24px 0 8px 0;">
+                <p style="font-size: 0.95em; color: #888;">Acest mesaj a fost trimis automat de sistemul GAL.</p>
+            </div>
+        </div>
+    `;
+    }
     findAll() {
         return this.memberModel.find().exec();
     }
@@ -96,19 +119,35 @@ let MembersService = MembersService_1 = class MembersService {
     getByEmail(email) {
         return this.memberModel.findOne({ email }).exec();
     }
-    async create(dto) {
+    async provisionAccountForEmail(email, excludeMemberId) {
+        const existingMember = await this.getByEmail(email);
+        if (existingMember && existingMember._id.toString() !== excludeMemberId) {
+            throw new common_1.BadRequestException('Member with this email already exists');
+        }
         const password = this.generateRandomPassword();
         const hashedPassword = await (0, argon2_1.hash)(password);
-        const member = await this.memberModel.create({
-            ...dto,
-            password: hashedPassword
-        });
         await this.transporter.sendMail({
             from: `"GAL Admin" <${process.env.SMTP_USERNAME}>`,
-            to: dto.email,
+            to: email,
             subject: 'Bun venit în GAL - Contul tău a fost creat',
-            html: this.createHtmlMessageCreation(dto.email, password),
+            html: this.createHtmlMessageCreation(email, password),
             replyTo: process.env.SMTP_USERNAME
+        });
+        return hashedPassword;
+    }
+    async create(dto) {
+        if (dto.roles?.includes(member_enum_1.MemberRolesEnum.PRESIDENT)) {
+            const presidentExists = await this.memberModel.exists({ roles: member_enum_1.MemberRolesEnum.PRESIDENT });
+            if (presidentExists) {
+                throw new common_1.BadRequestException('A president already exists — remove or reassign them first');
+            }
+        }
+        const hashedPassword = dto.email ? await this.provisionAccountForEmail(dto.email) : undefined;
+        const { email, ...memberData } = dto;
+        const member = await this.memberModel.create({
+            ...memberData,
+            ...(email ? { email } : {}),
+            ...(hashedPassword ? { password: hashedPassword } : {})
         });
         await this.syncManagement();
         return member.toObject();
@@ -116,7 +155,25 @@ let MembersService = MembersService_1 = class MembersService {
     async update(id, dto) {
         if (!dto || Object.keys(dto).length === 0)
             throw new common_1.BadRequestException('No data provided');
-        let data = dto;
+        const existingMember = await this.memberModel.findById(id);
+        if (!existingMember)
+            throw new common_1.NotFoundException('Member not found');
+        if (dto.roles?.includes(member_enum_1.MemberRolesEnum.PRESIDENT)) {
+            const presidentExists = await this.memberModel.exists({
+                roles: member_enum_1.MemberRolesEnum.PRESIDENT,
+                _id: { $ne: id }
+            });
+            if (presidentExists) {
+                throw new common_1.BadRequestException('A president already exists — remove or reassign them first');
+            }
+        }
+        const data = { ...dto };
+        if (!existingMember.email && dto.email) {
+            data.password = await this.provisionAccountForEmail(dto.email, id);
+        }
+        else {
+            delete data.email;
+        }
         const member = await this.memberModel.findByIdAndUpdate(id, data, { new: true });
         await this.syncManagement();
         return member;
@@ -144,12 +201,67 @@ let MembersService = MembersService_1 = class MembersService {
         });
         return { message: 'Password reset successfully' };
     }
+    async forgotPassword(email) {
+        const member = await this.getByEmail(email);
+        if (!member)
+            return { message: 'If that email exists, a reset link has been sent' };
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        await this.memberModel
+            .findByIdAndUpdate(member._id, {
+            resetPasswordTokenHash: tokenHash,
+            resetPasswordTokenExpires: new Date(Date.now() + RESET_TOKEN_TTL_MS)
+        })
+            .exec();
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const resetUrl = `${frontendUrl}/voting/reset-password?token=${token}`;
+        await this.transporter.sendMail({
+            from: `"GAL Admin" <${process.env.SMTP_USERNAME}>`,
+            to: email,
+            subject: 'Resetare parolă - GAL',
+            html: this.createHtmlMessageResetLink(resetUrl),
+            replyTo: process.env.SMTP_USERNAME
+        });
+        return { message: 'If that email exists, a reset link has been sent' };
+    }
+    async confirmPasswordReset(token) {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const member = await this.memberModel
+            .findOne({ resetPasswordTokenHash: tokenHash, resetPasswordTokenExpires: { $gt: new Date() } })
+            .exec();
+        if (!member || !member.email)
+            throw new common_1.BadRequestException('This reset link is invalid or has expired');
+        const newPassword = this.generateRandomPassword();
+        const hashedPassword = await (0, argon2_1.hash)(newPassword);
+        await this.memberModel
+            .findByIdAndUpdate(member._id, {
+            password: hashedPassword,
+            resetPasswordTokenHash: null,
+            resetPasswordTokenExpires: null
+        })
+            .exec();
+        await this.transporter.sendMail({
+            from: `"GAL Admin" <${process.env.SMTP_USERNAME}>`,
+            to: member.email,
+            subject: 'Resetare parolă - GAL',
+            html: this.createHtmlMessageReset(member.email, newPassword),
+            replyTo: process.env.SMTP_USERNAME
+        });
+        return { message: 'A new password has been sent to your email' };
+    }
+    async generateImageUploadLink() {
+        return this.awsService.generateUploadLink('MEMBERS');
+    }
+    async deleteMemberImages(imageUrls) {
+        return this.awsService.deleteImages(imageUrls);
+    }
 };
 exports.MembersService = MembersService;
 exports.MembersService = MembersService = MembersService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(member_schema_1.Member.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
-        management_service_1.ManagementService])
+        management_service_1.ManagementService,
+        aws_service_1.AwsService])
 ], MembersService);
 //# sourceMappingURL=members.service.js.map

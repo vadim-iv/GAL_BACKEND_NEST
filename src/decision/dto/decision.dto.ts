@@ -28,8 +28,14 @@ export class DecisionAnswerDto {
   @IsMongoId()
   memberId: string;
 
+  @IsOptional()
   @IsString()
-  value: string;
+  value?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  values?: string[];
 }
 
 export class DecisionQuestionDto {

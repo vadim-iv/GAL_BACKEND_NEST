@@ -12,11 +12,14 @@ export declare class MembersAuthService {
         accessToken: string;
         refreshToken: string;
         member: {
-            email: string;
+            email?: string;
             name: import("../../schemas/shared/text.schema").MultiLangText;
-            details: import("../../schemas/shared/text.schema").MultiLangText;
+            details?: import("../../schemas/shared/text.schema").MultiLangText;
+            shortDetails: import("../../schemas/shared/text.schema").MultiLangText;
             imageUrl?: string;
-            role: import("../../enums/member.enum").MemberRolesEnum;
+            roles: import("../../enums/member.enum").MemberRolesEnum[];
+            resetPasswordTokenHash?: string;
+            resetPasswordTokenExpires?: Date;
             _id: import("mongoose").Types.ObjectId;
             __v: number;
         };
@@ -25,11 +28,14 @@ export declare class MembersAuthService {
         accessToken: string;
         refreshToken: string;
         member: {
-            email: string;
+            email?: string;
             name: import("../../schemas/shared/text.schema").MultiLangText;
-            details: import("../../schemas/shared/text.schema").MultiLangText;
+            details?: import("../../schemas/shared/text.schema").MultiLangText;
+            shortDetails: import("../../schemas/shared/text.schema").MultiLangText;
             imageUrl?: string;
-            role: import("../../enums/member.enum").MemberRolesEnum;
+            roles: import("../../enums/member.enum").MemberRolesEnum[];
+            resetPasswordTokenHash?: string;
+            resetPasswordTokenExpires?: Date;
             _id: import("mongoose").Types.ObjectId;
             __v: number;
         };

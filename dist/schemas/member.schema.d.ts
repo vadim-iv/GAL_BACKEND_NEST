@@ -3,12 +3,15 @@ import { MultiLangText } from './shared/text.schema';
 import { MemberRolesEnum } from 'src/enums/member.enum';
 export type TMember = HydratedDocument<Member>;
 export declare class Member {
-    email: string;
-    password: string;
+    email?: string;
+    password?: string;
     name: MultiLangText;
-    details: MultiLangText;
+    details?: MultiLangText;
+    shortDetails: MultiLangText;
     imageUrl?: string;
-    role: MemberRolesEnum;
+    roles: MemberRolesEnum[];
+    resetPasswordTokenHash?: string;
+    resetPasswordTokenExpires?: Date;
 }
 export declare const MemberSchema: import("mongoose").Schema<Member, import("mongoose").Model<Member, any, any, any, import("mongoose").Document<unknown, any, Member, any> & Member & {
     _id: import("mongoose").Types.ObjectId;

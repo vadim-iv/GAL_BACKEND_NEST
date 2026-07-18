@@ -16,12 +16,12 @@ exports.LocalCallController = void 0;
 const common_1 = require("@nestjs/common");
 const local_call_service_1 = require("./local-call.service");
 const get_local_calls_dto_1 = require("./dto/get-local-calls.dto");
+const get_projects_dto_1 = require("./dto/get-projects.dto");
 const local_call_dto_1 = require("./dto/local-call.dto");
 const update_local_call_dto_1 = require("./dto/update-local-call.dto");
 const project_dto_1 = require("./dto/project.dto");
 const update_project_dto_1 = require("./dto/update-project.dto");
 const add_answers_dto_1 = require("./dto/add-answers.dto");
-const update_status_dto_1 = require("./dto/update-status.dto");
 const auth_decorator_1 = require("../auth/decorators/auth.decorator");
 const member_auth_decorator_1 = require("../auth/decorators/member-auth.decorator");
 const delete_images_dto_1 = require("../blogs/dto/delete-images.dto");
@@ -35,6 +35,9 @@ let LocalCallController = class LocalCallController {
     }
     async getById(id) {
         return this.localCallService.getById(id);
+    }
+    async getProjects(id, dto) {
+        return this.localCallService.getProjects(id, dto);
     }
     async create(dto) {
         return this.localCallService.create(dto);
@@ -54,9 +57,6 @@ let LocalCallController = class LocalCallController {
     async deleteProject(id, projectId) {
         return this.localCallService.deleteProject(id, projectId);
     }
-    async updateProjectStatus(id, projectId, dto) {
-        return this.localCallService.updateProjectStatus(id, projectId, dto.status);
-    }
     async addAnswers(dto) {
         return this.localCallService.addAnswers(dto);
     }
@@ -69,8 +69,8 @@ let LocalCallController = class LocalCallController {
     async deleteFiles(dto) {
         return this.localCallService.deleteDocuments(dto.imageUrls);
     }
-    async generateResultsPdf(id, lang) {
-        const buffer = await this.localCallService.generateResultsPdf(id, lang);
+    async generateProjectResultsPdf(id, projectId, lang) {
+        const buffer = await this.localCallService.generateProjectResultsPdf(id, projectId, lang);
         return new common_1.StreamableFile(buffer);
     }
 };
@@ -90,6 +90,15 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], LocalCallController.prototype, "getById", null);
+__decorate([
+    (0, common_1.Get)(':id/projects'),
+    (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true })),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, get_projects_dto_1.GetProjectsDto]),
+    __metadata("design:returntype", Promise)
+], LocalCallController.prototype, "getProjects", null);
 __decorate([
     (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true })),
     (0, common_1.HttpCode)(200),
@@ -166,18 +175,6 @@ __decorate([
 __decorate([
     (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true })),
     (0, common_1.HttpCode)(200),
-    (0, common_1.Patch)(':id/project/:projectId/status'),
-    (0, auth_decorator_1.Auth)(),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Param)('projectId')),
-    __param(2, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, update_status_dto_1.UpdateStatusDto]),
-    __metadata("design:returntype", Promise)
-], LocalCallController.prototype, "updateProjectStatus", null);
-__decorate([
-    (0, common_1.UsePipes)(new common_1.ValidationPipe({ transform: true, forbidNonWhitelisted: true, whitelist: true })),
-    (0, common_1.HttpCode)(200),
     (0, common_1.Post)('add-answers'),
     (0, member_auth_decorator_1.MemberAuth)(),
     __param(0, (0, common_1.Body)()),
@@ -213,16 +210,17 @@ __decorate([
 ], LocalCallController.prototype, "deleteFiles", null);
 __decorate([
     (0, common_1.Header)('Content-Type', 'application/pdf'),
-    (0, common_1.Header)('Content-Disposition', 'attachment; filename="local-call-results.pdf"'),
+    (0, common_1.Header)('Content-Disposition', 'attachment; filename="project-results.pdf"'),
     (0, common_1.HttpCode)(200),
-    (0, common_1.Post)(':id/results-pdf'),
+    (0, common_1.Post)(':id/project/:projectId/results-pdf'),
     (0, auth_decorator_1.Auth)(),
     __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Query)('lang')),
+    __param(1, (0, common_1.Param)('projectId')),
+    __param(2, (0, common_1.Query)('lang')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:paramtypes", [String, String, String]),
     __metadata("design:returntype", Promise)
-], LocalCallController.prototype, "generateResultsPdf", null);
+], LocalCallController.prototype, "generateProjectResultsPdf", null);
 exports.LocalCallController = LocalCallController = __decorate([
     (0, common_1.Controller)('local-call'),
     __metadata("design:paramtypes", [local_call_service_1.LocalCallService])

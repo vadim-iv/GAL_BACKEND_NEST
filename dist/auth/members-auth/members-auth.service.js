@@ -54,7 +54,7 @@ let MembersAuthService = class MembersAuthService {
     }
     async validateMember(dto) {
         const member = await this.membersService.getByEmail(dto.email);
-        if (!member)
+        if (!member || !member.password)
             throw new common_1.NotFoundException('User not found');
         const isValid = await (0, argon2_1.verify)(member.password, dto.password);
         if (!isValid)

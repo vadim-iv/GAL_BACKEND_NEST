@@ -7,11 +7,14 @@ export declare class MembersAuthController {
     login(dto: MemberAuthDto, res: Response): Promise<{
         accessToken: string;
         member: {
-            email: string;
+            email?: string;
             name: import("../../schemas/shared/text.schema").MultiLangText;
-            details: import("../../schemas/shared/text.schema").MultiLangText;
+            details?: import("../../schemas/shared/text.schema").MultiLangText;
+            shortDetails: import("../../schemas/shared/text.schema").MultiLangText;
             imageUrl?: string;
-            role: import("../../enums/member.enum").MemberRolesEnum;
+            roles: import("../../enums/member.enum").MemberRolesEnum[];
+            resetPasswordTokenHash?: string;
+            resetPasswordTokenExpires?: Date;
             _id: import("mongoose").Types.ObjectId;
             __v: number;
         };
@@ -19,11 +22,14 @@ export declare class MembersAuthController {
     getNewTokens(req: Request, res: Response): Promise<{
         accessToken: string;
         member: {
-            email: string;
+            email?: string;
             name: import("../../schemas/shared/text.schema").MultiLangText;
-            details: import("../../schemas/shared/text.schema").MultiLangText;
+            details?: import("../../schemas/shared/text.schema").MultiLangText;
+            shortDetails: import("../../schemas/shared/text.schema").MultiLangText;
             imageUrl?: string;
-            role: import("../../enums/member.enum").MemberRolesEnum;
+            roles: import("../../enums/member.enum").MemberRolesEnum[];
+            resetPasswordTokenHash?: string;
+            resetPasswordTokenExpires?: Date;
             _id: import("mongoose").Types.ObjectId;
             __v: number;
         };

@@ -5,6 +5,7 @@ var MemberRolesEnum;
 (function (MemberRolesEnum) {
     MemberRolesEnum["PRESIDENT"] = "PRESIDENT";
     MemberRolesEnum["EXECUTIVE_BODY"] = "EXECUTIVE_BODY";
+    MemberRolesEnum["GENERAL_ASSEMBLY"] = "GENERAL_ASSEMBLY";
     MemberRolesEnum["ADMINISTRATION"] = "ADMINISTRATION";
     MemberRolesEnum["SELECTION_COMMITTEE"] = "SELECTION_COMMITTEE";
     MemberRolesEnum["CENSORSHIP_COMMITTEE"] = "CENSORSHIP_COMMITTEE";

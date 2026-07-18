@@ -18,16 +18,19 @@ let Member = class Member {
     password;
     name;
     details;
+    shortDetails;
     imageUrl;
-    role;
+    roles;
+    resetPasswordTokenHash;
+    resetPasswordTokenExpires;
 };
 exports.Member = Member;
 __decorate([
-    (0, mongoose_1.Prop)({ type: String, required: true, unique: true }),
+    (0, mongoose_1.Prop)({ type: String, required: false, unique: true, sparse: true }),
     __metadata("design:type", String)
 ], Member.prototype, "email", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: String, required: true }),
+    (0, mongoose_1.Prop)({ type: String, required: false }),
     __metadata("design:type", String)
 ], Member.prototype, "password", void 0);
 __decorate([
@@ -35,17 +38,29 @@ __decorate([
     __metadata("design:type", text_schema_1.MultiLangText)
 ], Member.prototype, "name", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: text_schema_1.MultiLangText, required: true }),
+    (0, mongoose_1.Prop)({ type: text_schema_1.MultiLangText, required: false }),
     __metadata("design:type", text_schema_1.MultiLangText)
 ], Member.prototype, "details", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: text_schema_1.MultiLangText, required: true }),
+    __metadata("design:type", text_schema_1.MultiLangText)
+], Member.prototype, "shortDetails", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: String, required: false }),
     __metadata("design:type", String)
 ], Member.prototype, "imageUrl", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: String, enum: member_enum_1.MemberRolesEnum, required: true }),
+    (0, mongoose_1.Prop)({ type: [String], enum: member_enum_1.MemberRolesEnum, required: true }),
+    __metadata("design:type", Array)
+], Member.prototype, "roles", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, required: false }),
     __metadata("design:type", String)
-], Member.prototype, "role", void 0);
+], Member.prototype, "resetPasswordTokenHash", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Date, required: false }),
+    __metadata("design:type", Date)
+], Member.prototype, "resetPasswordTokenExpires", void 0);
 exports.Member = Member = __decorate([
     (0, mongoose_1.Schema)()
 ], Member);

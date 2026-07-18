@@ -5,8 +5,12 @@ import { MemberRolesEnum } from "src/enums/member.enum";
 
 export class MemberDto {
 
+  // @IsOptional() only skips later validators for null/undefined, not '' — the
+  // frontend sends an empty string for a deliberately-blank email, so @IsEmail()
+  // needs to be skipped on falsy values explicitly via @ValidateIf instead.
+  @ValidateIf((o) => !!o.email)
   @IsEmail()
-  email: string;
+  email?: string;
 
   @IsObject()
   @ValidateNested()
