@@ -26,6 +26,7 @@ import {
 	estimateVerticalBarChartHeight
 } from './results-pdf.charts'
 import { MultiLangTextLike, ResultsPdfLang, t, tr } from './results-pdf.i18n'
+import { HTML_ENTITIES, drawRichText, measureRichTextHeight, parseRichText } from './results-pdf.richtext'
 import { COLORS, FONT_FAMILY, FONT_SIZE, PAGE, SPACING, STATUS_PILL_HEIGHT } from './results-pdf.theme'
 
 export { ResultsPdfLang } from './results-pdf.i18n'
@@ -89,19 +90,11 @@ function contentWidth(doc: PDFKit.PDFDocument): number {
 	return doc.page.width - PAGE.margins.left - PAGE.margins.right
 }
 
-const HTML_ENTITIES: Record<string, string> = {
-	'&nbsp;': ' ',
-	'&amp;': '&',
-	'&lt;': '<',
-	'&gt;': '>',
-	'&quot;': '"',
-	'&#39;': "'",
-	'&apos;': "'"
-}
-
-// The decision description comes from the admin's rich-text editor and is stored
-// as HTML — this renders it as plain text for the PDF: block-level tags become
-// line breaks (so paragraph structure survives), everything else is stripped.
+// Decision/local-call descriptions come from the admin's rich-text editor and
+// are stored as HTML — this renders them as plain text for the PDF: block-level
+// tags become line breaks (so paragraph structure survives), everything else is
+// stripped. Question text uses the real formatting-aware renderer in
+// results-pdf.richtext.ts instead (see renderDecisionQuestion/renderProjectQuestion).
 function stripHtml(html: string): string {
 	return html
 		.replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
@@ -218,10 +211,8 @@ function renderDecisionQuestion(
 ): void {
 	const innerX = x + SPACING.cardPadding
 	const innerWidth = width - SPACING.cardPadding * 2
-	const questionLabel = t(question.question as MultiLangTextLike, lang)
-
-	doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.sectionLabel)
-	const labelHeight = doc.heightOfString(questionLabel, { width: innerWidth })
+	const questionBlocks = parseRichText(t(question.question as MultiLangTextLike, lang))
+	const labelHeight = measureRichTextHeight(doc, questionBlocks, innerWidth, FONT_SIZE.sectionLabel)
 
 	const isChoice = question.type === DecisionQuestionType.RADIO || question.type === DecisionQuestionType.CHECKBOX
 	const answers = question.answers || []
@@ -264,11 +255,7 @@ function renderDecisionQuestion(
 	const cardTop = doc.y
 	drawCard(doc, x, cardTop, width, cardHeight)
 
-	doc
-		.font(FONT_FAMILY.semiBold)
-		.fontSize(FONT_SIZE.sectionLabel)
-		.fillColor(COLORS.green700)
-		.text(questionLabel, innerX, cardTop + SPACING.cardPadding, { width: innerWidth })
+	drawRichText(doc, questionBlocks, innerX, cardTop + SPACING.cardPadding, innerWidth, FONT_SIZE.sectionLabel, COLORS.green700)
 
 	const bodyTop = cardTop + SPACING.cardPadding + labelHeight + 10
 
@@ -371,10 +358,8 @@ function renderProjectQuestion(
 ): void {
 	const innerX = x + SPACING.cardPadding
 	const innerWidth = width - SPACING.cardPadding * 2
-	const questionLabel = `${t(question.question as MultiLangTextLike, lang)}  (${tr(lang, 'maxLabel')} ${question.maxScore})`
-
-	doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.sectionLabel)
-	const labelHeight = doc.heightOfString(questionLabel, { width: innerWidth })
+	const questionBlocks = parseRichText(t(question.question as MultiLangTextLike, lang))
+	const labelHeight = measureRichTextHeight(doc, questionBlocks, innerWidth, FONT_SIZE.sectionLabel)
 
 	const questionAnswers = (project.answers || []).filter((a) => a.questionId.toString() === question._id.toString())
 	const buckets: ScoreBucket[] = Array.from({ length: question.maxScore + 1 }, (_, value) => ({
@@ -389,11 +374,7 @@ function renderProjectQuestion(
 	const cardTop = doc.y
 	drawCard(doc, x, cardTop, width, cardHeight)
 
-	doc
-		.font(FONT_FAMILY.semiBold)
-		.fontSize(FONT_SIZE.sectionLabel)
-		.fillColor(COLORS.green700)
-		.text(questionLabel, innerX, cardTop + SPACING.cardPadding, { width: innerWidth })
+	drawRichText(doc, questionBlocks, innerX, cardTop + SPACING.cardPadding, innerWidth, FONT_SIZE.sectionLabel, COLORS.green700)
 
 	if (questionAnswers.length > 0) {
 		const mean = questionAnswers.reduce((sum, a) => sum + a.answer, 0) / questionAnswers.length

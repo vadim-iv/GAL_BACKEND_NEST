@@ -16,6 +16,8 @@ export declare class MembersService {
     private createHtmlMessageCreation;
     private createHtmlMessageReset;
     private createHtmlMessageResetLink;
+    private createHtmlMessageEmailChanged;
+    private createHtmlMessageAccountRemoved;
     findAll(): Promise<(import("mongoose").Document<unknown, {}, Member, {}> & Member & {
         _id: import("mongoose").Types.ObjectId;
     } & {
@@ -31,7 +33,10 @@ export declare class MembersService {
     } & {
         __v: number;
     }) | null>;
+    private assertEmailAvailable;
     private provisionAccountForEmail;
+    private notifyAccountRemoved;
+    private reprovisionAccountForEmailChange;
     create(dto: MemberDto): Promise<Member & {
         _id: import("mongoose").Types.ObjectId;
     } & {

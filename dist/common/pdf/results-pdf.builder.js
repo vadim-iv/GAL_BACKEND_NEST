@@ -6,6 +6,7 @@ const decision_enum_1 = require("../../enums/decision.enum");
 const results_pdf_layout_1 = require("./results-pdf.layout");
 const results_pdf_charts_1 = require("./results-pdf.charts");
 const results_pdf_i18n_1 = require("./results-pdf.i18n");
+const results_pdf_richtext_1 = require("./results-pdf.richtext");
 const results_pdf_theme_1 = require("./results-pdf.theme");
 function getMemberIdString(memberId) {
     if (!memberId)
@@ -37,21 +38,12 @@ function calculateAverageMark(questions, answers) {
 function contentWidth(doc) {
     return doc.page.width - results_pdf_theme_1.PAGE.margins.left - results_pdf_theme_1.PAGE.margins.right;
 }
-const HTML_ENTITIES = {
-    '&nbsp;': ' ',
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&quot;': '"',
-    '&#39;': "'",
-    '&apos;': "'"
-};
 function stripHtml(html) {
     return html
         .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/<[^>]+>/g, '')
-        .replace(/&[a-z#0-9]+;/gi, (entity) => HTML_ENTITIES[entity.toLowerCase()] ?? entity)
+        .replace(/&[a-z#0-9]+;/gi, (entity) => results_pdf_richtext_1.HTML_ENTITIES[entity.toLowerCase()] ?? entity)
         .replace(/\n{2,}/g, '\n')
         .trim();
 }
@@ -118,9 +110,8 @@ async function buildDecisionResultsPdf(decision, lang = 'ro') {
 function renderDecisionQuestion(doc, question, x, width, lang) {
     const innerX = x + results_pdf_theme_1.SPACING.cardPadding;
     const innerWidth = width - results_pdf_theme_1.SPACING.cardPadding * 2;
-    const questionLabel = (0, results_pdf_i18n_1.t)(question.question, lang);
-    doc.font(results_pdf_theme_1.FONT_FAMILY.semiBold).fontSize(results_pdf_theme_1.FONT_SIZE.sectionLabel);
-    const labelHeight = doc.heightOfString(questionLabel, { width: innerWidth });
+    const questionBlocks = (0, results_pdf_richtext_1.parseRichText)((0, results_pdf_i18n_1.t)(question.question, lang));
+    const labelHeight = (0, results_pdf_richtext_1.measureRichTextHeight)(doc, questionBlocks, innerWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel);
     const isChoice = question.type === decision_enum_1.DecisionQuestionType.RADIO || question.type === decision_enum_1.DecisionQuestionType.CHECKBOX;
     const answers = question.answers || [];
     let options = [];
@@ -156,11 +147,7 @@ function renderDecisionQuestion(doc, question, x, width, lang) {
     (0, results_pdf_layout_1.ensureSpace)(doc, cardHeight + results_pdf_theme_1.SPACING.cardGap);
     const cardTop = doc.y;
     (0, results_pdf_layout_1.drawCard)(doc, x, cardTop, width, cardHeight);
-    doc
-        .font(results_pdf_theme_1.FONT_FAMILY.semiBold)
-        .fontSize(results_pdf_theme_1.FONT_SIZE.sectionLabel)
-        .fillColor(results_pdf_theme_1.COLORS.green700)
-        .text(questionLabel, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, { width: innerWidth });
+    (0, results_pdf_richtext_1.drawRichText)(doc, questionBlocks, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, innerWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel, results_pdf_theme_1.COLORS.green700);
     const bodyTop = cardTop + results_pdf_theme_1.SPACING.cardPadding + labelHeight + 10;
     if (isChoice) {
         (0, results_pdf_charts_1.drawHorizontalBarChart)(doc, innerX, bodyTop, innerWidth, options, answers.length, lang);
@@ -216,9 +203,8 @@ async function buildProjectResultsPdf(localCall, project, lang = 'ro') {
 function renderProjectQuestion(doc, question, project, x, width, lang) {
     const innerX = x + results_pdf_theme_1.SPACING.cardPadding;
     const innerWidth = width - results_pdf_theme_1.SPACING.cardPadding * 2;
-    const questionLabel = `${(0, results_pdf_i18n_1.t)(question.question, lang)}  (${(0, results_pdf_i18n_1.tr)(lang, 'maxLabel')} ${question.maxScore})`;
-    doc.font(results_pdf_theme_1.FONT_FAMILY.semiBold).fontSize(results_pdf_theme_1.FONT_SIZE.sectionLabel);
-    const labelHeight = doc.heightOfString(questionLabel, { width: innerWidth });
+    const questionBlocks = (0, results_pdf_richtext_1.parseRichText)((0, results_pdf_i18n_1.t)(question.question, lang));
+    const labelHeight = (0, results_pdf_richtext_1.measureRichTextHeight)(doc, questionBlocks, innerWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel);
     const questionAnswers = (project.answers || []).filter((a) => a.questionId.toString() === question._id.toString());
     const buckets = Array.from({ length: question.maxScore + 1 }, (_, value) => ({
         value,
@@ -229,11 +215,7 @@ function renderProjectQuestion(doc, question, project, x, width, lang) {
     (0, results_pdf_layout_1.ensureSpace)(doc, cardHeight + results_pdf_theme_1.SPACING.cardGap);
     const cardTop = doc.y;
     (0, results_pdf_layout_1.drawCard)(doc, x, cardTop, width, cardHeight);
-    doc
-        .font(results_pdf_theme_1.FONT_FAMILY.semiBold)
-        .fontSize(results_pdf_theme_1.FONT_SIZE.sectionLabel)
-        .fillColor(results_pdf_theme_1.COLORS.green700)
-        .text(questionLabel, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, { width: innerWidth });
+    (0, results_pdf_richtext_1.drawRichText)(doc, questionBlocks, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, innerWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel, results_pdf_theme_1.COLORS.green700);
     if (questionAnswers.length > 0) {
         const mean = questionAnswers.reduce((sum, a) => sum + a.answer, 0) / questionAnswers.length;
         doc

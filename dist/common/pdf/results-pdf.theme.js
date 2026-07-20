@@ -38,7 +38,7 @@ exports.STATUS_PILL_HEIGHT = 20;
 exports.FONT_SIZE = {
     title: 20,
     subtitle: 12,
-    sectionLabel: 13,
+    sectionLabel: 11,
     body: 10,
     small: 9,
     statValue: 14,
