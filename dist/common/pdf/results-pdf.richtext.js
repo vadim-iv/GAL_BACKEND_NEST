@@ -202,30 +202,56 @@ function layoutRichText(doc, blocks, x, y, width, baseFontSize, color, draw) {
                 continue;
             }
             selectFont(doc, token, baseFontSize);
-            const tokenWidth = doc.widthOfString(token.text);
             if (token.isSpace) {
+                const spaceWidth = doc.widthOfString(token.text);
                 if (lineHasContent)
-                    lineX += tokenWidth;
+                    lineX += spaceWidth;
                 continue;
             }
-            if (lineHasContent && lineX + tokenWidth > contentX + contentWidth) {
-                cursorY += lineHeight;
-                lineX = contentX;
-                lineHasContent = false;
+            let remaining = token.text;
+            while (remaining.length > 0) {
+                const availableWidth = contentX + contentWidth - lineX;
+                const remainingWidth = doc.widthOfString(remaining);
+                let piece;
+                let pieceWidth;
+                if (remainingWidth <= availableWidth || (!lineHasContent && remainingWidth <= contentWidth)) {
+                    piece = remaining;
+                    pieceWidth = remainingWidth;
+                }
+                else if (lineHasContent) {
+                    cursorY += lineHeight;
+                    lineX = contentX;
+                    lineHasContent = false;
+                    continue;
+                }
+                else {
+                    piece = remaining;
+                    pieceWidth = remainingWidth;
+                    while (piece.length > 1 && pieceWidth > contentWidth) {
+                        piece = piece.slice(0, -1);
+                        pieceWidth = doc.widthOfString(piece);
+                    }
+                }
+                if (draw) {
+                    const size = fontSizeFor(token, baseFontSize);
+                    const yOffset = token.sup ? -(size * 0.4) : token.sub ? size * 0.25 : 0;
+                    doc.fillColor(color);
+                    doc.text(piece, lineX, cursorY + yOffset, {
+                        width: pieceWidth,
+                        lineBreak: false,
+                        underline: !!token.underline,
+                        strike: !!token.strike
+                    });
+                }
+                lineX += pieceWidth;
+                lineHasContent = true;
+                remaining = remaining.slice(piece.length);
+                if (remaining.length > 0) {
+                    cursorY += lineHeight;
+                    lineX = contentX;
+                    lineHasContent = false;
+                }
             }
-            if (draw) {
-                const size = fontSizeFor(token, baseFontSize);
-                const yOffset = token.sup ? -(size * 0.4) : token.sub ? size * 0.25 : 0;
-                doc.fillColor(color);
-                doc.text(token.text, lineX, cursorY + yOffset, {
-                    width: tokenWidth,
-                    lineBreak: false,
-                    underline: !!token.underline,
-                    strike: !!token.strike
-                });
-            }
-            lineX += tokenWidth;
-            lineHasContent = true;
         }
         cursorY += lineHeight + BLOCK_GAP;
     }

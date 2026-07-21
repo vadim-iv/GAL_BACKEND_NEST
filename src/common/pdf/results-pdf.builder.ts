@@ -21,8 +21,10 @@ import {
 	BarChartOption,
 	ScoreBucket,
 	drawHorizontalBarChart,
+	drawScoreNames,
 	drawVerticalBarChart,
 	estimateHorizontalBarChartHeight,
+	estimateScoreNamesHeight,
 	estimateVerticalBarChartHeight
 } from './results-pdf.charts'
 import { MultiLangTextLike, ResultsPdfLang, t, tr } from './results-pdf.i18n'
@@ -33,16 +35,31 @@ export { ResultsPdfLang } from './results-pdf.i18n'
 
 // After population (both call sites populate `...answers.memberId`), memberId is a
 // full Member subdocument rather than a raw ObjectId — this reads the id correctly
-// either way, since only the distinct-voter count is ever needed here, never the
-// member's name/email (that per-member display is exactly what's being removed).
-// null when the member who cast that vote was later deleted — the populated
-// reference has nothing left to resolve to, so there's no id to return.
+// either way. null when the member who cast that vote was later deleted — the
+// populated reference has nothing left to resolve to, so there's no id to return.
 function getMemberIdString(memberId: Types.ObjectId | { _id: Types.ObjectId } | null): string | null {
 	if (!memberId) return null
 	if (typeof memberId === 'object' && '_id' in memberId) {
 		return memberId._id.toString()
 	}
 	return (memberId as Types.ObjectId).toString()
+}
+
+// Same populated-vs-raw-ObjectId situation as getMemberIdString, but resolving
+// to the member's own display name instead of their id, for the "who voted for
+// what" names shown next to each chart. Returns null when memberId no longer
+// resolves (deleted after voting) — deleted members are deliberately left out
+// of the names lists entirely; their vote still counts in the aggregate
+// totals/tallies (that's tracked separately, via getMemberIdString/the
+// deleted-voters note), just not attributed to a name.
+function resolveMemberName(
+	memberId: Types.ObjectId | { _id: Types.ObjectId; name?: MultiLangTextLike } | null,
+	lang: ResultsPdfLang
+): string | null {
+	if (memberId && typeof memberId === 'object' && 'name' in memberId && memberId.name) {
+		return t(memberId.name, lang)
+	}
+	return null
 }
 
 // A deleted member's votes stay on the decision/project forever (their answer
@@ -69,21 +86,29 @@ function getDeletedVotersNote(deletedVoters: number, lang: ResultsPdfLang): stri
 	return `(${tr(lang, 'and')} ${deletedVoters} ${word})`
 }
 
-// Blends each project's answers into a single 0-10 mark, normalizing per-question
-// since questions can each have their own maxScore.
+// The project's overall mark: each question's own maxScore points sums into
+// the denominator (regardless of whether it has been answered yet), and each
+// question's own average response (across everyone who answered it) sums into
+// the numerator — e.g. a 7-question local call with maxScore 10/10/10/10/8/8/8
+// (64 total) where respondents averaged well on most of them nets a result
+// like 19.5/64, not a 0-10 normalized blend.
 function calculateAverageMark(
 	questions: { _id: Types.ObjectId; maxScore: number }[],
 	answers: { questionId: Types.ObjectId; answer: number }[]
-): number {
-	if (!answers || answers.length === 0) return 0
+): { sum: number; max: number } {
+	let sum = 0
+	let max = 0
 
-	const normalized = answers.map((a) => {
-		const question = questions.find((q) => q._id.toString() === a.questionId.toString())
-		const maxScore = question?.maxScore || 10
-		return (a.answer / maxScore) * 10
-	})
+	for (const question of questions) {
+		max += question.maxScore
 
-	return normalized.reduce((acc, val) => acc + val, 0) / normalized.length
+		const questionAnswers = (answers || []).filter((a) => a.questionId.toString() === question._id.toString())
+		if (questionAnswers.length > 0) {
+			sum += questionAnswers.reduce((acc, a) => acc + a.answer, 0) / questionAnswers.length
+		}
+	}
+
+	return { sum, max }
 }
 
 function contentWidth(doc: PDFKit.PDFDocument): number {
@@ -115,10 +140,18 @@ function renderToBuffer(lang: ResultsPdfLang, render: (doc: PDFKit.PDFDocument) 
 		doc.on('end', () => resolve(Buffer.concat(chunks)))
 		doc.on('error', reject)
 
-		// Page 1 is created inside `createDocument()`, before this listener exists,
-		// so it needs one explicit draw; every later page (explicit ensureSpace()
-		// breaks or pdfkit's own overflow inside a long chart/list) fires the event.
-		doc.on('pageAdded', () => drawHeader(doc))
+		// The logo/org-name header only belongs on page 1. Every later page
+		// (explicit ensureSpace() breaks or pdfkit's own overflow inside a long
+		// chart/list) instead shrinks its top margin down to match the side
+		// margins and starts content right there, since there's no header
+		// reserving that space anymore.
+		doc.on('pageAdded', () => {
+			doc.page.margins.top = PAGE.margins.left
+			doc.x = PAGE.margins.left
+			doc.y = doc.page.margins.top
+		})
+		// Page 1 is created inside `createDocument()`, before the listener above
+		// exists, so it needs one explicit draw.
 		drawHeader(doc)
 
 		render(doc)
@@ -218,35 +251,45 @@ function renderDecisionQuestion(
 	const answers = question.answers || []
 
 	let options: BarChartOption[] = []
-	let textAnswers: string[] = []
+	let textAnswers: { name: string; value: string }[] = []
 	let bodyHeight = 0
 
 	if (isChoice) {
 		const tally = new Map<string, number>()
-		for (const option of question.options || []) tally.set(option.value, 0)
+		const namesByOption = new Map<string, string[]>()
+		for (const option of question.options || []) {
+			tally.set(option.value, 0)
+			namesByOption.set(option.value, [])
+		}
 		// CHECKBOX answers carry `values` (a respondent can count toward several
-		// options at once) — RADIO answers carry a single `value`. `answers.length`
-		// stays a valid "number of respondents" denominator either way, since one
-		// answer doc is still pushed per member per question.
+		// options at once, and so can appear in more than one option's names
+		// list) — RADIO answers carry a single `value`. `answers.length` stays a
+		// valid "number of respondents" denominator either way, since one answer
+		// doc is still pushed per member per question.
 		for (const answer of answers) {
 			const selected = question.type === DecisionQuestionType.CHECKBOX ? answer.values || [] : [answer.value]
+			const memberName = resolveMemberName(answer.memberId, lang)
 			for (const value of selected) {
 				if (!value) continue
 				tally.set(value, (tally.get(value) || 0) + 1)
+				if (memberName) namesByOption.get(value)?.push(memberName)
 			}
 		}
 		options = (question.options || []).map((o) => ({
 			label: t(o.label as MultiLangTextLike, lang),
-			count: tally.get(o.value) || 0
+			count: tally.get(o.value) || 0,
+			names: namesByOption.get(o.value) || []
 		}))
 		bodyHeight = estimateHorizontalBarChartHeight(doc, innerWidth, options, answers.length)
 	} else {
-		textAnswers = answers.map((a) => a.value || '')
+		textAnswers = answers
+			.map((a) => ({ name: resolveMemberName(a.memberId, lang), value: a.value || '' }))
+			.filter((a): a is { name: string; value: string } => a.name !== null)
 		doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.small)
 		bodyHeight =
 			textAnswers.length === 0
 				? doc.currentLineHeight()
-				: textAnswers.reduce((sum, ans) => sum + doc.heightOfString(`•  ${ans}`, { width: innerWidth }) + 4, 0)
+				: textAnswers.reduce((sum, a) => sum + doc.heightOfString(`•  ${a.name}: ${a.value}`, { width: innerWidth }) + 4, 0)
 	}
 
 	const cardHeight = SPACING.cardPadding * 2 + labelHeight + 10 + bodyHeight
@@ -266,9 +309,10 @@ function renderDecisionQuestion(
 	} else {
 		doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.small).fillColor(COLORS.gray700)
 		let cursorY = bodyTop
-		for (const ans of textAnswers) {
-			doc.text(`•  ${ans}`, innerX, cursorY, { width: innerWidth })
-			cursorY += doc.heightOfString(`•  ${ans}`, { width: innerWidth }) + 4
+		for (const a of textAnswers) {
+			const line = `•  ${a.name}: ${a.value}`
+			doc.text(line, innerX, cursorY, { width: innerWidth })
+			cursorY += doc.heightOfString(line, { width: innerWidth }) + 4
 		}
 	}
 
@@ -312,7 +356,7 @@ export async function buildProjectResultsPdf(
 		const pillWidth = measureStatusPillWidth(doc, project.status, lang)
 		const tileWidth = (width - pillWidth - statGap * 2) / 2
 		const averageScoreLabel = tr(lang, 'averageScore')
-		const averageScoreValue = `${averageMark.toFixed(2)} / 10`
+		const averageScoreValue = `${averageMark.sum.toFixed(1)}/${averageMark.max}`
 		const totalVotersLabel = tr(lang, 'totalVoters')
 
 		const rowHeight = Math.max(
@@ -358,38 +402,59 @@ function renderProjectQuestion(
 ): void {
 	const innerX = x + SPACING.cardPadding
 	const innerWidth = width - SPACING.cardPadding * 2
-	const questionBlocks = parseRichText(t(question.question as MultiLangTextLike, lang))
-	const labelHeight = measureRichTextHeight(doc, questionBlocks, innerWidth, FONT_SIZE.sectionLabel)
 
 	const questionAnswers = (project.answers || []).filter((a) => a.questionId.toString() === question._id.toString())
-	const buckets: ScoreBucket[] = Array.from({ length: question.maxScore + 1 }, (_, value) => ({
-		value,
-		count: questionAnswers.filter((a) => a.answer === value).length
-	}))
+	const mean = questionAnswers.length > 0 ? questionAnswers.reduce((sum, a) => sum + a.answer, 0) / questionAnswers.length : 0
+	const scoreText = questionAnswers.length > 0 ? `${mean.toFixed(1)} / ${question.maxScore}` : ''
 
-	const bodyHeight = estimateVerticalBarChartHeight(doc, questionAnswers.length > 0)
+	// The mean/maxScore badge sits top-right, on the same line the question text
+	// starts on — reserve its width (plus a gap) out of the question's wrap
+	// width up front, rather than letting the two overlap when the question's
+	// first line happens to run the full width of the card.
+	const scoreGap = 12
+	let scoreWidth = 0
+	if (scoreText) {
+		doc.font(FONT_FAMILY.semiBold).fontSize(FONT_SIZE.body)
+		scoreWidth = doc.widthOfString(scoreText) + scoreGap
+	}
+	const questionWidth = innerWidth - scoreWidth
+
+	const questionBlocks = parseRichText(t(question.question as MultiLangTextLike, lang))
+	const labelHeight = measureRichTextHeight(doc, questionBlocks, questionWidth, FONT_SIZE.sectionLabel)
+
+	const buckets: ScoreBucket[] = Array.from({ length: question.maxScore + 1 }, (_, value) => {
+		const bucketAnswers = questionAnswers.filter((a) => a.answer === value)
+		return {
+			value,
+			count: bucketAnswers.length,
+			names: bucketAnswers.map((a) => resolveMemberName(a.memberId, lang)).filter((name): name is string => name !== null)
+		}
+	})
+
+	const namesHeight = estimateScoreNamesHeight(doc, buckets, innerWidth)
+	const bodyHeight = estimateVerticalBarChartHeight(doc, questionAnswers.length > 0) + namesHeight
 	const cardHeight = SPACING.cardPadding * 2 + labelHeight + 10 + bodyHeight
 	ensureSpace(doc, cardHeight + SPACING.cardGap)
 
 	const cardTop = doc.y
 	drawCard(doc, x, cardTop, width, cardHeight)
 
-	drawRichText(doc, questionBlocks, innerX, cardTop + SPACING.cardPadding, innerWidth, FONT_SIZE.sectionLabel, COLORS.green700)
+	drawRichText(doc, questionBlocks, innerX, cardTop + SPACING.cardPadding, questionWidth, FONT_SIZE.sectionLabel, COLORS.green700)
 
-	if (questionAnswers.length > 0) {
-		const mean = questionAnswers.reduce((sum, a) => sum + a.answer, 0) / questionAnswers.length
+	if (scoreText) {
 		doc
 			.font(FONT_FAMILY.semiBold)
 			.fontSize(FONT_SIZE.body)
 			.fillColor(COLORS.green600)
-			.text(`${mean.toFixed(1)} / ${question.maxScore}`, innerX, cardTop + SPACING.cardPadding, {
+			.text(scoreText, innerX, cardTop + SPACING.cardPadding, {
 				width: innerWidth,
 				align: 'right'
 			})
 	}
 
 	const bodyTop = cardTop + SPACING.cardPadding + labelHeight + 10
-	drawVerticalBarChart(doc, innerX, bodyTop, innerWidth, buckets, lang)
+	const chartBottom = drawVerticalBarChart(doc, innerX, bodyTop, innerWidth, buckets, lang)
+	drawScoreNames(doc, innerX, chartBottom, buckets, innerWidth)
 
 	doc.y = cardTop + cardHeight + SPACING.cardGap
 }

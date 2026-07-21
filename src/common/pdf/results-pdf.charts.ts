@@ -6,6 +6,7 @@ const BAR_GAP = 14
 const LABEL_GAP = 4
 const TRACK_TO_COUNT_GAP = 8
 const COUNT_LABEL_RESERVED = 64
+const NAMES_LINE_GAP = 10
 
 const VERTICAL_CHART_HEIGHT = 100
 const VERTICAL_CHART_TOP_GAP = 16
@@ -37,6 +38,11 @@ export function truncateToLines(doc: PDFKit.PDFDocument, text: string, width: nu
 export interface BarChartOption {
 	label: string
 	count: number
+	// Respondents who picked this option, in submission order — shown as a
+	// wrapped, comma-separated line under the bar so it's clear who voted for
+	// what, not just how many. Never truncated: a popular option can list every
+	// one of ~40 members across as many lines as it takes.
+	names: string[]
 }
 
 export function estimateHorizontalBarChartHeight(
@@ -51,7 +57,11 @@ export function estimateHorizontalBarChartHeight(
 	let height = totalRespondents === 0 ? doc.currentLineHeight() + LABEL_GAP : 0
 	for (const option of options) {
 		const truncated = truncateToLines(doc, option.label, trackWidth, 2)
-		height += doc.heightOfString(truncated, { width: trackWidth }) + LABEL_GAP + BAR_HEIGHT + BAR_GAP
+		height += doc.heightOfString(truncated, { width: trackWidth }) + LABEL_GAP + BAR_HEIGHT
+		if (option.names.length > 0) {
+			height += NAMES_LINE_GAP + doc.heightOfString(option.names.join(', '), { width })
+		}
+		height += BAR_GAP
 	}
 	return height
 }
@@ -102,7 +112,17 @@ export function drawHorizontalBarChart(
 				align: 'left'
 			})
 
-		cursorY += BAR_HEIGHT + BAR_GAP
+		cursorY += BAR_HEIGHT
+
+		if (option.names.length > 0) {
+			const namesText = option.names.join(', ')
+			cursorY += NAMES_LINE_GAP
+			doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.small).fillColor(COLORS.gray600)
+			doc.text(namesText, x, cursorY, { width })
+			cursorY += doc.heightOfString(namesText, { width })
+		}
+
+		cursorY += BAR_GAP
 	}
 
 	return cursorY
@@ -111,6 +131,43 @@ export function drawHorizontalBarChart(
 export interface ScoreBucket {
 	value: number
 	count: number
+	// Respondents who gave this exact score — bars are too narrow to hold
+	// wrapped names themselves, so these render as their own "N: name, name…"
+	// lines below the whole chart instead (see estimateScoreNamesHeight/drawScoreNames).
+	names: string[]
+}
+
+const SCORE_NAMES_ROW_GAP = 2
+// Extra breathing room between the chart's 0..maxScore axis digits and the
+// first names row — without it the two sit almost flush against each other.
+const SCORE_NAMES_TOP_MARGIN = 12
+
+// Below-the-chart names block for drawVerticalBarChart — one row per
+// non-empty bucket ("8: Ion Popescu, Maria Ionescu"). Kept separate from
+// drawVerticalBarChart itself (called right after it by the caller) rather
+// than folded in, since it's a flat list unrelated to the bar geometry.
+export function estimateScoreNamesHeight(doc: PDFKit.PDFDocument, buckets: ScoreBucket[], width: number): number {
+	doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.small)
+	let height = 0
+	for (const bucket of buckets) {
+		if (bucket.names.length === 0) continue
+		const line = `${bucket.value}: ${bucket.names.join(', ')}`
+		height += doc.heightOfString(line, { width }) + SCORE_NAMES_ROW_GAP
+	}
+	return height > 0 ? height + SCORE_NAMES_TOP_MARGIN : 0
+}
+
+export function drawScoreNames(doc: PDFKit.PDFDocument, x: number, y: number, buckets: ScoreBucket[], width: number): number {
+	const hasAnyNames = buckets.some((b) => b.names.length > 0)
+	let cursorY = hasAnyNames ? y + SCORE_NAMES_TOP_MARGIN : y
+	doc.font(FONT_FAMILY.regular).fontSize(FONT_SIZE.small).fillColor(COLORS.gray600)
+	for (const bucket of buckets) {
+		if (bucket.names.length === 0) continue
+		const line = `${bucket.value}: ${bucket.names.join(', ')}`
+		doc.text(line, x, cursorY, { width })
+		cursorY += doc.heightOfString(line, { width }) + SCORE_NAMES_ROW_GAP
+	}
+	return cursorY
 }
 
 export function estimateVerticalBarChartHeight(doc: PDFKit.PDFDocument, hasAnswers: boolean): number {

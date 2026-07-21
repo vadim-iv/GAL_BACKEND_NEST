@@ -3,6 +3,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.truncateToLines = truncateToLines;
 exports.estimateHorizontalBarChartHeight = estimateHorizontalBarChartHeight;
 exports.drawHorizontalBarChart = drawHorizontalBarChart;
+exports.estimateScoreNamesHeight = estimateScoreNamesHeight;
+exports.drawScoreNames = drawScoreNames;
 exports.estimateVerticalBarChartHeight = estimateVerticalBarChartHeight;
 exports.drawVerticalBarChart = drawVerticalBarChart;
 const results_pdf_theme_1 = require("./results-pdf.theme");
@@ -12,6 +14,7 @@ const BAR_GAP = 14;
 const LABEL_GAP = 4;
 const TRACK_TO_COUNT_GAP = 8;
 const COUNT_LABEL_RESERVED = 64;
+const NAMES_LINE_GAP = 10;
 const VERTICAL_CHART_HEIGHT = 100;
 const VERTICAL_CHART_TOP_GAP = 16;
 const VERTICAL_CHART_AXIS_HEIGHT = 14;
@@ -41,7 +44,11 @@ function estimateHorizontalBarChartHeight(doc, width, options, totalRespondents)
     let height = totalRespondents === 0 ? doc.currentLineHeight() + LABEL_GAP : 0;
     for (const option of options) {
         const truncated = truncateToLines(doc, option.label, trackWidth, 2);
-        height += doc.heightOfString(truncated, { width: trackWidth }) + LABEL_GAP + BAR_HEIGHT + BAR_GAP;
+        height += doc.heightOfString(truncated, { width: trackWidth }) + LABEL_GAP + BAR_HEIGHT;
+        if (option.names.length > 0) {
+            height += NAMES_LINE_GAP + doc.heightOfString(option.names.join(', '), { width });
+        }
+        height += BAR_GAP;
     }
     return height;
 }
@@ -73,7 +80,41 @@ function drawHorizontalBarChart(doc, x, y, width, options, totalRespondents, lan
             width: COUNT_LABEL_RESERVED - TRACK_TO_COUNT_GAP,
             align: 'left'
         });
-        cursorY += BAR_HEIGHT + BAR_GAP;
+        cursorY += BAR_HEIGHT;
+        if (option.names.length > 0) {
+            const namesText = option.names.join(', ');
+            cursorY += NAMES_LINE_GAP;
+            doc.font(results_pdf_theme_1.FONT_FAMILY.regular).fontSize(results_pdf_theme_1.FONT_SIZE.small).fillColor(results_pdf_theme_1.COLORS.gray600);
+            doc.text(namesText, x, cursorY, { width });
+            cursorY += doc.heightOfString(namesText, { width });
+        }
+        cursorY += BAR_GAP;
+    }
+    return cursorY;
+}
+const SCORE_NAMES_ROW_GAP = 2;
+const SCORE_NAMES_TOP_MARGIN = 12;
+function estimateScoreNamesHeight(doc, buckets, width) {
+    doc.font(results_pdf_theme_1.FONT_FAMILY.regular).fontSize(results_pdf_theme_1.FONT_SIZE.small);
+    let height = 0;
+    for (const bucket of buckets) {
+        if (bucket.names.length === 0)
+            continue;
+        const line = `${bucket.value}: ${bucket.names.join(', ')}`;
+        height += doc.heightOfString(line, { width }) + SCORE_NAMES_ROW_GAP;
+    }
+    return height > 0 ? height + SCORE_NAMES_TOP_MARGIN : 0;
+}
+function drawScoreNames(doc, x, y, buckets, width) {
+    const hasAnyNames = buckets.some((b) => b.names.length > 0);
+    let cursorY = hasAnyNames ? y + SCORE_NAMES_TOP_MARGIN : y;
+    doc.font(results_pdf_theme_1.FONT_FAMILY.regular).fontSize(results_pdf_theme_1.FONT_SIZE.small).fillColor(results_pdf_theme_1.COLORS.gray600);
+    for (const bucket of buckets) {
+        if (bucket.names.length === 0)
+            continue;
+        const line = `${bucket.value}: ${bucket.names.join(', ')}`;
+        doc.text(line, x, cursorY, { width });
+        cursorY += doc.heightOfString(line, { width }) + SCORE_NAMES_ROW_GAP;
     }
     return cursorY;
 }

@@ -3,12 +3,16 @@ export declare function truncateToLines(doc: PDFKit.PDFDocument, text: string, w
 export interface BarChartOption {
     label: string;
     count: number;
+    names: string[];
 }
 export declare function estimateHorizontalBarChartHeight(doc: PDFKit.PDFDocument, width: number, options: BarChartOption[], totalRespondents: number): number;
 export declare function drawHorizontalBarChart(doc: PDFKit.PDFDocument, x: number, y: number, width: number, options: BarChartOption[], totalRespondents: number, lang: ResultsPdfLang): number;
 export interface ScoreBucket {
     value: number;
     count: number;
+    names: string[];
 }
+export declare function estimateScoreNamesHeight(doc: PDFKit.PDFDocument, buckets: ScoreBucket[], width: number): number;
+export declare function drawScoreNames(doc: PDFKit.PDFDocument, x: number, y: number, buckets: ScoreBucket[], width: number): number;
 export declare function estimateVerticalBarChartHeight(doc: PDFKit.PDFDocument, hasAnswers: boolean): number;
 export declare function drawVerticalBarChart(doc: PDFKit.PDFDocument, x: number, y: number, width: number, buckets: ScoreBucket[], lang: ResultsPdfLang): number;

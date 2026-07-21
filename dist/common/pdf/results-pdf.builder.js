@@ -16,6 +16,12 @@ function getMemberIdString(memberId) {
     }
     return memberId.toString();
 }
+function resolveMemberName(memberId, lang) {
+    if (memberId && typeof memberId === 'object' && 'name' in memberId && memberId.name) {
+        return (0, results_pdf_i18n_1.t)(memberId.name, lang);
+    }
+    return null;
+}
 function countDeletedVoters(perQuestionAnswers) {
     return Math.max(0, ...perQuestionAnswers.map((answers) => answers.filter((a) => !a.memberId).length));
 }
@@ -26,14 +32,16 @@ function getDeletedVotersNote(deletedVoters, lang) {
     return `(${(0, results_pdf_i18n_1.tr)(lang, 'and')} ${deletedVoters} ${word})`;
 }
 function calculateAverageMark(questions, answers) {
-    if (!answers || answers.length === 0)
-        return 0;
-    const normalized = answers.map((a) => {
-        const question = questions.find((q) => q._id.toString() === a.questionId.toString());
-        const maxScore = question?.maxScore || 10;
-        return (a.answer / maxScore) * 10;
-    });
-    return normalized.reduce((acc, val) => acc + val, 0) / normalized.length;
+    let sum = 0;
+    let max = 0;
+    for (const question of questions) {
+        max += question.maxScore;
+        const questionAnswers = (answers || []).filter((a) => a.questionId.toString() === question._id.toString());
+        if (questionAnswers.length > 0) {
+            sum += questionAnswers.reduce((acc, a) => acc + a.answer, 0) / questionAnswers.length;
+        }
+    }
+    return { sum, max };
 }
 function contentWidth(doc) {
     return doc.page.width - results_pdf_theme_1.PAGE.margins.left - results_pdf_theme_1.PAGE.margins.right;
@@ -55,7 +63,11 @@ function renderToBuffer(lang, render) {
         doc.on('data', (chunk) => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
-        doc.on('pageAdded', () => (0, results_pdf_layout_1.drawHeader)(doc));
+        doc.on('pageAdded', () => {
+            doc.page.margins.top = results_pdf_theme_1.PAGE.margins.left;
+            doc.x = results_pdf_theme_1.PAGE.margins.left;
+            doc.y = doc.page.margins.top;
+        });
         (0, results_pdf_layout_1.drawHeader)(doc);
         render(doc);
         const range = doc.bufferedPageRange();
@@ -119,29 +131,38 @@ function renderDecisionQuestion(doc, question, x, width, lang) {
     let bodyHeight = 0;
     if (isChoice) {
         const tally = new Map();
-        for (const option of question.options || [])
+        const namesByOption = new Map();
+        for (const option of question.options || []) {
             tally.set(option.value, 0);
+            namesByOption.set(option.value, []);
+        }
         for (const answer of answers) {
             const selected = question.type === decision_enum_1.DecisionQuestionType.CHECKBOX ? answer.values || [] : [answer.value];
+            const memberName = resolveMemberName(answer.memberId, lang);
             for (const value of selected) {
                 if (!value)
                     continue;
                 tally.set(value, (tally.get(value) || 0) + 1);
+                if (memberName)
+                    namesByOption.get(value)?.push(memberName);
             }
         }
         options = (question.options || []).map((o) => ({
             label: (0, results_pdf_i18n_1.t)(o.label, lang),
-            count: tally.get(o.value) || 0
+            count: tally.get(o.value) || 0,
+            names: namesByOption.get(o.value) || []
         }));
         bodyHeight = (0, results_pdf_charts_1.estimateHorizontalBarChartHeight)(doc, innerWidth, options, answers.length);
     }
     else {
-        textAnswers = answers.map((a) => a.value || '');
+        textAnswers = answers
+            .map((a) => ({ name: resolveMemberName(a.memberId, lang), value: a.value || '' }))
+            .filter((a) => a.name !== null);
         doc.font(results_pdf_theme_1.FONT_FAMILY.regular).fontSize(results_pdf_theme_1.FONT_SIZE.small);
         bodyHeight =
             textAnswers.length === 0
                 ? doc.currentLineHeight()
-                : textAnswers.reduce((sum, ans) => sum + doc.heightOfString(`•  ${ans}`, { width: innerWidth }) + 4, 0);
+                : textAnswers.reduce((sum, a) => sum + doc.heightOfString(`•  ${a.name}: ${a.value}`, { width: innerWidth }) + 4, 0);
     }
     const cardHeight = results_pdf_theme_1.SPACING.cardPadding * 2 + labelHeight + 10 + bodyHeight;
     (0, results_pdf_layout_1.ensureSpace)(doc, cardHeight + results_pdf_theme_1.SPACING.cardGap);
@@ -158,9 +179,10 @@ function renderDecisionQuestion(doc, question, x, width, lang) {
     else {
         doc.font(results_pdf_theme_1.FONT_FAMILY.regular).fontSize(results_pdf_theme_1.FONT_SIZE.small).fillColor(results_pdf_theme_1.COLORS.gray700);
         let cursorY = bodyTop;
-        for (const ans of textAnswers) {
-            doc.text(`•  ${ans}`, innerX, cursorY, { width: innerWidth });
-            cursorY += doc.heightOfString(`•  ${ans}`, { width: innerWidth }) + 4;
+        for (const a of textAnswers) {
+            const line = `•  ${a.name}: ${a.value}`;
+            doc.text(line, innerX, cursorY, { width: innerWidth });
+            cursorY += doc.heightOfString(line, { width: innerWidth }) + 4;
         }
     }
     doc.y = cardTop + cardHeight + results_pdf_theme_1.SPACING.cardGap;
@@ -188,7 +210,7 @@ async function buildProjectResultsPdf(localCall, project, lang = 'ro') {
         const pillWidth = (0, results_pdf_layout_1.measureStatusPillWidth)(doc, project.status, lang);
         const tileWidth = (width - pillWidth - statGap * 2) / 2;
         const averageScoreLabel = (0, results_pdf_i18n_1.tr)(lang, 'averageScore');
-        const averageScoreValue = `${averageMark.toFixed(2)} / 10`;
+        const averageScoreValue = `${averageMark.sum.toFixed(1)}/${averageMark.max}`;
         const totalVotersLabel = (0, results_pdf_i18n_1.tr)(lang, 'totalVoters');
         const rowHeight = Math.max(results_pdf_theme_1.STATUS_PILL_HEIGHT, (0, results_pdf_layout_1.measureStatTileHeight)(doc, tileWidth, averageScoreLabel, averageScoreValue), (0, results_pdf_layout_1.measureStatTileHeight)(doc, tileWidth, totalVotersLabel, String(totalVoters), deletedVotersNote));
         const pill = (0, results_pdf_layout_1.drawStatusPill)(doc, x, statTop + (rowHeight - results_pdf_theme_1.STATUS_PILL_HEIGHT) / 2, project.status, lang);
@@ -203,32 +225,46 @@ async function buildProjectResultsPdf(localCall, project, lang = 'ro') {
 function renderProjectQuestion(doc, question, project, x, width, lang) {
     const innerX = x + results_pdf_theme_1.SPACING.cardPadding;
     const innerWidth = width - results_pdf_theme_1.SPACING.cardPadding * 2;
-    const questionBlocks = (0, results_pdf_richtext_1.parseRichText)((0, results_pdf_i18n_1.t)(question.question, lang));
-    const labelHeight = (0, results_pdf_richtext_1.measureRichTextHeight)(doc, questionBlocks, innerWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel);
     const questionAnswers = (project.answers || []).filter((a) => a.questionId.toString() === question._id.toString());
-    const buckets = Array.from({ length: question.maxScore + 1 }, (_, value) => ({
-        value,
-        count: questionAnswers.filter((a) => a.answer === value).length
-    }));
-    const bodyHeight = (0, results_pdf_charts_1.estimateVerticalBarChartHeight)(doc, questionAnswers.length > 0);
+    const mean = questionAnswers.length > 0 ? questionAnswers.reduce((sum, a) => sum + a.answer, 0) / questionAnswers.length : 0;
+    const scoreText = questionAnswers.length > 0 ? `${mean.toFixed(1)} / ${question.maxScore}` : '';
+    const scoreGap = 12;
+    let scoreWidth = 0;
+    if (scoreText) {
+        doc.font(results_pdf_theme_1.FONT_FAMILY.semiBold).fontSize(results_pdf_theme_1.FONT_SIZE.body);
+        scoreWidth = doc.widthOfString(scoreText) + scoreGap;
+    }
+    const questionWidth = innerWidth - scoreWidth;
+    const questionBlocks = (0, results_pdf_richtext_1.parseRichText)((0, results_pdf_i18n_1.t)(question.question, lang));
+    const labelHeight = (0, results_pdf_richtext_1.measureRichTextHeight)(doc, questionBlocks, questionWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel);
+    const buckets = Array.from({ length: question.maxScore + 1 }, (_, value) => {
+        const bucketAnswers = questionAnswers.filter((a) => a.answer === value);
+        return {
+            value,
+            count: bucketAnswers.length,
+            names: bucketAnswers.map((a) => resolveMemberName(a.memberId, lang)).filter((name) => name !== null)
+        };
+    });
+    const namesHeight = (0, results_pdf_charts_1.estimateScoreNamesHeight)(doc, buckets, innerWidth);
+    const bodyHeight = (0, results_pdf_charts_1.estimateVerticalBarChartHeight)(doc, questionAnswers.length > 0) + namesHeight;
     const cardHeight = results_pdf_theme_1.SPACING.cardPadding * 2 + labelHeight + 10 + bodyHeight;
     (0, results_pdf_layout_1.ensureSpace)(doc, cardHeight + results_pdf_theme_1.SPACING.cardGap);
     const cardTop = doc.y;
     (0, results_pdf_layout_1.drawCard)(doc, x, cardTop, width, cardHeight);
-    (0, results_pdf_richtext_1.drawRichText)(doc, questionBlocks, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, innerWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel, results_pdf_theme_1.COLORS.green700);
-    if (questionAnswers.length > 0) {
-        const mean = questionAnswers.reduce((sum, a) => sum + a.answer, 0) / questionAnswers.length;
+    (0, results_pdf_richtext_1.drawRichText)(doc, questionBlocks, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, questionWidth, results_pdf_theme_1.FONT_SIZE.sectionLabel, results_pdf_theme_1.COLORS.green700);
+    if (scoreText) {
         doc
             .font(results_pdf_theme_1.FONT_FAMILY.semiBold)
             .fontSize(results_pdf_theme_1.FONT_SIZE.body)
             .fillColor(results_pdf_theme_1.COLORS.green600)
-            .text(`${mean.toFixed(1)} / ${question.maxScore}`, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, {
+            .text(scoreText, innerX, cardTop + results_pdf_theme_1.SPACING.cardPadding, {
             width: innerWidth,
             align: 'right'
         });
     }
     const bodyTop = cardTop + results_pdf_theme_1.SPACING.cardPadding + labelHeight + 10;
-    (0, results_pdf_charts_1.drawVerticalBarChart)(doc, innerX, bodyTop, innerWidth, buckets, lang);
+    const chartBottom = (0, results_pdf_charts_1.drawVerticalBarChart)(doc, innerX, bodyTop, innerWidth, buckets, lang);
+    (0, results_pdf_charts_1.drawScoreNames)(doc, innerX, chartBottom, buckets, innerWidth);
     doc.y = cardTop + cardHeight + results_pdf_theme_1.SPACING.cardGap;
 }
 //# sourceMappingURL=results-pdf.builder.js.map
