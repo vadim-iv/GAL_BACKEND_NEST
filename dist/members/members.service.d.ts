@@ -13,6 +13,8 @@ export declare class MembersService {
     private syncManagement;
     private transporter;
     private generateRandomPassword;
+    private getLoginUrl;
+    private loginCtaHtml;
     private createHtmlMessageCreation;
     private createHtmlMessageReset;
     private createHtmlMessageResetLink;

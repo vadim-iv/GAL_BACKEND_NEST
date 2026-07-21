@@ -61,6 +61,18 @@ let MembersService = MembersService_1 = class MembersService {
         }
         return password;
     }
+    getLoginUrl() {
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        return `${frontendUrl}/votare/login`;
+    }
+    loginCtaHtml() {
+        const loginUrl = this.getLoginUrl();
+        return `
+                <p style="text-align: center; margin: 24px 0;">
+                    <a href="${loginUrl}" style="background: #4C8332; color: #FFFEFD; padding: 12px 24px; border-radius: 24px; text-decoration: none; font-weight: bold; display: inline-block;">Accesează platforma de vot</a>
+                </p>
+`;
+    }
     createHtmlMessageCreation(email, password) {
         return `
         <div style="font-family: Arial, sans-serif; background: #F6F6F6; padding: 32px;">
@@ -71,6 +83,7 @@ let MembersService = MembersService_1 = class MembersService {
                 <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 16px 0;">
                 <p style="color: #11200B;"><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
                 <p style="color: #11200B;"><strong>Parolă:</strong> <code style="background: #4C833230; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 1.1em;">${password}</code></p>
+                ${this.loginCtaHtml()}
                 <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 24px 0 8px 0;">
                 <p style="font-size: 0.95em; color: #888;">Acest mesaj a fost trimis automat de sistemul GAL.</p>
             </div>
@@ -87,6 +100,7 @@ let MembersService = MembersService_1 = class MembersService {
                 <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 16px 0;">
                 <p style="color: #11200B;"><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
                 <p style="color: #11200B;"><strong>Parolă:</strong> <code style="background: #4C833230; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 1.1em;">${password}</code></p>
+                ${this.loginCtaHtml()}
                 <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 24px 0 8px 0;">
                 <p style="font-size: 0.95em; color: #888;">Acest mesaj a fost trimis automat de sistemul GAL.</p>
             </div>
@@ -120,6 +134,7 @@ let MembersService = MembersService_1 = class MembersService {
                 <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 16px 0;">
                 <p style="color: #11200B;"><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
                 <p style="color: #11200B;"><strong>Parolă:</strong> <code style="background: #4C833230; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 1.1em;">${password}</code></p>
+                ${this.loginCtaHtml()}
                 <hr style="border: none; border-top: 1px solid #BFBFBE; margin: 24px 0 8px 0;">
                 <p style="font-size: 0.95em; color: #888;">Acest mesaj a fost trimis automat de sistemul GAL.</p>
             </div>
